@@ -18,10 +18,13 @@ const App: React.FC = () => {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [score, setScore] = useState(0);
 
-  // Upload Modal State
+  // Upload Modal State (For users adding new words at runtime)
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newWordText, setNewWordText] = useState('');
   const [newWordImage, setNewWordImage] = useState<string | null>(null);
+
+  // Image Loading State
+  const [imgError, setImgError] = useState(false);
 
   // PWA Install Prompt State
   const [showInstallModal, setShowInstallModal] = useState(false);
@@ -34,18 +37,7 @@ const App: React.FC = () => {
 
   // --- Initialization ---
   useEffect(() => {
-    // Load custom words from local storage
-    const saved = localStorage.getItem(STORAGE_KEY);
-    let customWords: TracingWord[] = [];
-    if (saved) {
-      try {
-        customWords = JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to load words", e);
-      }
-    }
-    setWords([...INITIAL_WORDS, ...customWords]);
-
+    loadWords();
     // Check for iOS Browser (eligible for PWA install instructions)
     const ua = window.navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
@@ -54,10 +46,30 @@ const App: React.FC = () => {
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
     
     setIsIOSBrowser(isIOS && !isStandalone);
-
   }, []);
 
+  const loadWords = () => {
+    // 1. Load Custom Words (added by user at runtime)
+    const savedCustom = localStorage.getItem(STORAGE_KEY);
+    let customWords: TracingWord[] = [];
+    if (savedCustom) {
+      try {
+        customWords = JSON.parse(savedCustom);
+      } catch (e) {
+        console.error("Failed to load custom words", e);
+      }
+    }
+
+    // 2. Combine with Initial Words (configured in constants.ts)
+    setWords([...INITIAL_WORDS, ...customWords]);
+  };
+
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
+
+  // Reset image error when word changes
+  useEffect(() => {
+    setImgError(false);
+  }, [currentIndex]);
 
   // --- Handlers: Canvas ---
   const handleClear = () => {
@@ -90,7 +102,7 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Handlers: Upload ---
+  // --- Handlers: Upload (New Word) ---
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -113,25 +125,25 @@ const App: React.FC = () => {
       emoji: !newWordImage ? '📝' : undefined
     };
 
-    const updatedWords = [...words, newWord];
-    setWords(updatedWords);
+    const savedCustom = localStorage.getItem(STORAGE_KEY);
+    const existingCustom = savedCustom ? JSON.parse(savedCustom) : [];
+    const updatedCustom = [...existingCustom, newWord];
     
-    // Persist only custom words (filter out initial ones to avoid duplication bugs if initials change)
-    const customOnly = updatedWords.filter(w => w.category === 'My Words');
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customOnly));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustom));
+    loadWords(); // Reload to refresh state
 
     // Reset and close
     setNewWordText('');
     setNewWordImage(null);
     setShowUploadModal(false);
     
-    // Jump to new word
+    // Jump to new word (it will be at end of list)
+    const newTotalLength = INITIAL_WORDS.length + updatedCustom.length;
     handleClear();
-    setCurrentIndex(updatedWords.length - 1);
+    setCurrentIndex(newTotalLength - 1);
   };
 
   // --- Styles ---
-  // When erasing, we still pass a color, but the canvas component will use 'destination-out'
   const activeColor = brushColor;
   const activeLineWidth = isEraserMode ? 40 : 16; 
 
@@ -211,28 +223,26 @@ const App: React.FC = () => {
         {/* Background Layer: Image & Text */}
         <div className="flex flex-col items-center justify-center gap-2 h-full w-full py-4 pointer-events-none select-none">
           
-          {/* Visual Cue (Image or Emoji) */}
-          <div className="flex-none h-[25%] flex items-center justify-center w-full px-8">
-            {currentWord.imageUrl ? (
-              <img 
-                src={currentWord.imageUrl} 
-                alt={currentWord.text} 
-                className="h-full w-auto object-contain rounded-xl shadow-lg border-4 border-white transform rotate-2"
-              />
-            ) : (
-              <span className="text-[12vh] leading-none filter drop-shadow-xl transform hover:scale-110 transition-transform">
-                {currentWord.emoji || '📝'}
-              </span>
-            )}
+          {/* Visual Cue */}
+          <div className="flex-none h-[25%] flex items-center justify-center w-full px-8 relative pointer-events-auto">
+             {currentWord.imageUrl && !imgError ? (
+                <img 
+                  src={currentWord.imageUrl} 
+                  onError={() => setImgError(true)}
+                  alt={currentWord.text} 
+                  className="h-[25vh] w-auto object-contain rounded-xl shadow-lg border-4 border-white transform rotate-2 animate-in zoom-in-95 duration-500"
+                />
+              ) : (
+                <span className="text-[12vh] leading-none filter drop-shadow-xl transform hover:scale-110 transition-transform block">
+                  {currentWord.emoji || '📝'}
+                </span>
+              )}
           </div>
 
-          {/* Tracing Text - Sized down to ~80% of previous size */}
-          <div className="flex-1 flex items-center justify-center w-full min-h-0">
+          {/* Tracing Text */}
+          <div className="flex-1 flex items-center justify-center w-full min-h-0 pointer-events-none">
             <span 
               ref={textRef}
-              // Reduced size from 35vh/50vh to 28vh/40vh (80% of original)
-              // Changed color to text-slate-300 with 80% opacity for better "greyed back" look
-              // Updated font to Andika
               className="text-[28vh] sm:text-[40vh] text-slate-300 opacity-80 tracking-widest leading-none text-center whitespace-nowrap"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
@@ -241,15 +251,14 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Foreground Layer: Canvas (Full Screen for drawing freedom) */}
-        <div className="absolute inset-0 w-full h-full">
-           <TraceCanvas 
+        {/* Foreground Layer: Canvas */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none" />
+        <TraceCanvas 
              ref={canvasRef} 
              color={activeColor} 
              lineWidth={activeLineWidth}
              isEraser={isEraserMode}
-           />
-        </div>
+        />
         
         {/* Score Modal */}
         {showScoreModal && (
@@ -268,7 +277,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Upload Modal */}
+        {/* Upload Modal (Add New Word) */}
         {showUploadModal && (
           <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
