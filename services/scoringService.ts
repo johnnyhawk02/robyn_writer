@@ -40,7 +40,7 @@ export const calculateScore = (
   const fontSizePx = parseFloat(computedStyle.fontSize);
   
   ctx.fillStyle = '#000000'; 
-  const fontFamily = computedStyle.fontFamily || '"Schoolbell", cursive';
+  const fontFamily = computedStyle.fontFamily || '"Andika", sans-serif';
   
   // Apply scaling to font size
   ctx.font = `${fontSizePx * dpr}px ${fontFamily}`;

@@ -3,14 +3,16 @@ import { BrushColor, TracingWord } from './types';
 import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X, Download, SquareArrowUp } from 'lucide-react';
 
 export const INITIAL_WORDS: TracingWord[] = [
+  { text: 'bed', category: 'Home', emoji: '🛏️' },
   { text: 'cat', category: 'Animals', emoji: '🐱' },
-  { text: 'dog', category: 'Animals', emoji: '🐶' },
-  { text: 'sun', category: 'Nature', emoji: '☀️' },
-  { text: 'moon', category: 'Nature', emoji: '🌙' },
-  { text: 'star', category: 'Nature', emoji: '⭐' },
-  { text: 'tree', category: 'Nature', emoji: '🌳' },
-  { text: 'apple', category: 'Food', emoji: '🍎' },
   { text: 'ball', category: 'Toys', emoji: '⚽' },
+  { text: 'doll', category: 'Toys', emoji: '🧸' },
+  { text: 'dog', category: 'Animals', emoji: '🐶' },
+  { text: 'bear', category: 'Animals', emoji: '🐻' },
+  { text: 'chair', category: 'Home', emoji: '🪑' },
+  { text: 'sitting', category: 'Actions', emoji: '🧘' },
+  { text: 'on', category: 'Position', emoji: '🔛' },
+  { text: 'socks', category: 'Clothes', emoji: '🧦' },
 ];
 
 export const PALETTE = [

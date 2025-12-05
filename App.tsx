@@ -131,7 +131,8 @@ const App: React.FC = () => {
   };
 
   // --- Styles ---
-  const activeColor = isEraserMode ? '#F8FAFC' : brushColor;
+  // When erasing, we still pass a color, but the canvas component will use 'destination-out'
+  const activeColor = brushColor;
   const activeLineWidth = isEraserMode ? 40 : 16; 
 
   // Helpers
@@ -225,12 +226,15 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Tracing Text - HUGE SIZE */}
+          {/* Tracing Text - Sized down to ~80% of previous size */}
           <div className="flex-1 flex items-center justify-center w-full min-h-0">
             <span 
               ref={textRef}
-              className="text-[35vh] sm:text-[50vh] text-gray-200 tracking-widest leading-none text-center whitespace-nowrap"
-              style={{ fontFamily: '"Schoolbell", cursive' }}
+              // Reduced size from 35vh/50vh to 28vh/40vh (80% of original)
+              // Changed color to text-slate-300 with 80% opacity for better "greyed back" look
+              // Updated font to Andika
+              className="text-[28vh] sm:text-[40vh] text-slate-300 opacity-80 tracking-widest leading-none text-center whitespace-nowrap"
+              style={{ fontFamily: '"Andika", sans-serif' }}
             >
               {currentWord.text}
             </span>
@@ -242,7 +246,8 @@ const App: React.FC = () => {
            <TraceCanvas 
              ref={canvasRef} 
              color={activeColor} 
-             lineWidth={activeLineWidth} 
+             lineWidth={activeLineWidth}
+             isEraser={isEraserMode}
            />
         </div>
         
