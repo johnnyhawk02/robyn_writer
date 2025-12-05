@@ -1,5 +1,5 @@
 import { BrushColor, TracingWord } from './types';
-import { Pencil, Trash2, ArrowRight, ArrowLeft, Wand2, Eraser, Trophy } from 'lucide-react';
+import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy } from 'lucide-react';
 
 export const INITIAL_WORDS: TracingWord[] = [
   { text: 'a', category: 'Letters' },
@@ -27,7 +27,6 @@ export const ICONS = {
   Trash: Trash2,
   Next: ArrowRight,
   Prev: ArrowLeft,
-  Magic: Wand2,
   Eraser,
   Trophy
 };

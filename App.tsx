@@ -1,9 +1,8 @@
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import TraceCanvas, { TraceCanvasHandle } from './components/TraceCanvas';
 import { INITIAL_WORDS, PALETTE, ICONS } from './constants';
 import { TracingWord, BrushColor } from './types';
-import { generateNewTracingWord } from './services/geminiService';
 import { calculateScore } from './services/scoringService';
 
 const App: React.FC = () => {
@@ -11,7 +10,6 @@ const App: React.FC = () => {
   const [words, setWords] = useState<TracingWord[]>(INITIAL_WORDS);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [brushColor, setBrushColor] = useState<string>(BrushColor.Black);
-  const [isLoading, setIsLoading] = useState(false);
   const [isEraserMode, setIsEraserMode] = useState(false);
   
   // Scoring State
@@ -38,22 +36,6 @@ const App: React.FC = () => {
   const handlePrev = () => {
     handleClear();
     setCurrentIndex((prev) => (prev - 1 + words.length) % words.length);
-  };
-
-  const handleMagicWord = async () => {
-    if (isLoading) return;
-    setIsLoading(true);
-    
-    const existingTexts = words.map(w => w.text);
-    const newWord = await generateNewTracingWord(existingTexts);
-    
-    if (newWord) {
-      setWords(prev => [...prev, newWord]);
-      setCurrentIndex(words.length); // Jump to the new word
-      handleClear();
-    }
-    
-    setIsLoading(false);
   };
 
   const toggleEraser = () => {
@@ -150,15 +132,6 @@ const App: React.FC = () => {
              lineWidth={activeLineWidth} 
            />
         </div>
-        
-        {/* Magic Button (Floating) */}
-        <button
-          onClick={handleMagicWord}
-          disabled={isLoading}
-          className={`absolute top-4 right-4 z-30 p-3 rounded-full shadow-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white transform transition-all duration-300 ${isLoading ? 'opacity-50 scale-90' : 'hover:scale-110 active:scale-95'}`}
-        >
-          <ICONS.Magic size={24} className={isLoading ? 'animate-spin' : ''} />
-        </button>
         
         {/* Score Modal / Overlay */}
         {showScoreModal && (
