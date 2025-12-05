@@ -75,7 +75,8 @@ const App: React.FC = () => {
     <div className="flex flex-col h-full w-full bg-slate-50 select-none">
       
       {/* --- Top Bar: Navigation --- */}
-      <header className="flex-none p-4 flex justify-between items-center bg-white shadow-sm z-20">
+      {/* Added pt-safe to avoid the notch/status bar on iPad */}
+      <header className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-white shadow-sm z-20">
         <button 
           onClick={handlePrev}
           className="p-3 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 transition-transform"
@@ -153,7 +154,8 @@ const App: React.FC = () => {
       </main>
 
       {/* --- Bottom Bar: Controls --- */}
-      <footer className="flex-none p-4 pb-8 sm:pb-4 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+      {/* Added pb-[env(safe-area-inset-bottom)] for home indicator space */}
+      <footer className="flex-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           
           {/* Action Row */}

@@ -2,10 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- Added viewport-fit=cover for full screen notch support -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TinyTracer</title>
-    <!-- Favicon to prevent 404 error -->
+    
+    <!-- PWA / Mobile Web App Capability -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TinyTracer">
+    <meta name="theme-color" content="#ffffff">
+
+    <!-- Icons -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✏️</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22white%22/><text y=%22.9em%22 font-size=%2290%22>✏️</text></svg>">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Schoolbell&display=swap" rel="stylesheet">
@@ -37,6 +48,9 @@
         user-select: none;
         -webkit-user-select: none;
         touch-action: none;
+        /* Safe area support for background */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
       }
     </style>
   <script type="importmap">
@@ -50,7 +64,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50 h-screen w-screen overflow-hidden">
+  <body class="bg-slate-50 h-screen w-screen overflow-hidden fixed inset-0">
     <div id="root" class="h-full w-full"></div>
     <!-- This script tag was missing, causing the blank screen -->
     <script type="module" src="./index.tsx"></script>
