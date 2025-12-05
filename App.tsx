@@ -136,7 +136,7 @@ const App: React.FC = () => {
           <span 
             ref={textRef}
             className="text-[20vh] sm:text-[30vh] text-gray-200 tracking-widest leading-none text-center"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            style={{ fontFamily: '"Schoolbell", cursive' }}
           >
             {currentWord.text}
           </span>

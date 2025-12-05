@@ -36,7 +36,7 @@ export const calculateScore = (
   // Apply styles
   ctx.fillStyle = '#000000'; // Draw target in black (alpha 255)
   // Use the exact font family stack from CSS or fallback
-  const fontFamily = computedStyle.fontFamily || '"Patrick Hand", cursive';
+  const fontFamily = computedStyle.fontFamily || '"Schoolbell", cursive';
   ctx.font = `${fontSizePx * dpr}px ${fontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
