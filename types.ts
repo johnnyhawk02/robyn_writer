@@ -1,6 +1,10 @@
+
 export interface TracingWord {
+  id?: string;
   text: string;
   category: string;
+  imageUrl?: string; // Base64 string for user uploads
+  emoji?: string;    // Fallback for default words
 }
 
 export enum BrushColor {
