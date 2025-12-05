@@ -1,6 +1,6 @@
 
 import { BrushColor, TracingWord } from './types';
-import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X } from 'lucide-react';
+import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X, Download, SquareArrowUp } from 'lucide-react';
 
 export const INITIAL_WORDS: TracingWord[] = [
   { text: 'cat', category: 'Animals', emoji: '🐱' },
@@ -32,5 +32,7 @@ export const ICONS = {
   Trophy,
   Plus,
   Image: ImageIcon,
-  Close: X
+  Close: X,
+  Download,
+  ShareIOS: SquareArrowUp
 };

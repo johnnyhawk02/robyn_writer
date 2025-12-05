@@ -23,6 +23,10 @@ const App: React.FC = () => {
   const [newWordText, setNewWordText] = useState('');
   const [newWordImage, setNewWordImage] = useState<string | null>(null);
 
+  // PWA Install Prompt State
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [isIOSBrowser, setIsIOSBrowser] = useState(false);
+
   // Refs
   const canvasRef = useRef<TraceCanvasHandle>(null);
   const textRef = useRef<HTMLSpanElement>(null);
@@ -41,6 +45,16 @@ const App: React.FC = () => {
       }
     }
     setWords([...INITIAL_WORDS, ...customWords]);
+
+    // Check for iOS Browser (eligible for PWA install instructions)
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isStandalone = 
+      ('standalone' in window.navigator && (window.navigator as any).standalone) || 
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    
+    setIsIOSBrowser(isIOS && !isStandalone);
+
   }, []);
 
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
@@ -164,6 +178,15 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+           {isIOSBrowser && (
+             <button 
+               onClick={() => setShowInstallModal(true)}
+               className="p-3 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 transition-transform"
+               title="Install App"
+             >
+               <ICONS.Download size={24} />
+             </button>
+           )}
            <button 
              onClick={() => setShowUploadModal(true)}
              className="p-3 rounded-full bg-crayon-blue/10 text-crayon-blue hover:bg-crayon-blue/20 active:scale-95 transition-transform"
@@ -300,6 +323,51 @@ const App: React.FC = () => {
                   Save Word
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* iOS Install Instruction Modal */}
+        {showInstallModal && (
+          <div className="absolute inset-0 z-[60] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-6">
+            <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
+              <div className="flex justify-end">
+                <button onClick={() => setShowInstallModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                  <ICONS.Close size={20} />
+                </button>
+              </div>
+              
+              <div className="flex justify-center mb-6">
+                 <div className="p-4 bg-crayon-blue/10 rounded-full">
+                   <ICONS.Download size={48} className="text-crayon-blue" />
+                 </div>
+              </div>
+
+              <h2 className="text-2xl font-bold text-slate-800 mb-2 font-hand">Install TinyTracer</h2>
+              <p className="text-slate-500 mb-8">Get the full screen experience for your child!</p>
+
+              <div className="space-y-6 text-left bg-slate-50 p-6 rounded-2xl">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-white rounded-lg shadow-sm">
+                    <ICONS.ShareIOS size={24} className="text-crayon-blue" />
+                  </div>
+                  <span className="font-bold text-slate-600">1. Tap the <span className="text-black">Share</span> button</span>
+                </div>
+                <div className="h-px bg-slate-200 w-full" />
+                <div className="flex items-center gap-4">
+                   <div className="p-2 bg-white rounded-lg shadow-sm">
+                    <ICONS.Plus size={24} className="text-crayon-blue" />
+                   </div>
+                  <span className="font-bold text-slate-600">2. Select <span className="text-black">Add to Home Screen</span></span>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowInstallModal(false)}
+                className="mt-8 w-full py-3 bg-crayon-blue text-white rounded-xl font-bold text-lg shadow-lg hover:bg-blue-600"
+              >
+                Got it!
+              </button>
             </div>
           </div>
         )}
