@@ -4,26 +4,20 @@ import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as I
 
 /* 
  * ==========================================
- * WHERE DO I PUT MY IMAGES?
+ * IMAGE SETUP
  * ==========================================
  * 
- * Your project folder should look like this:
+ * You have two options for images:
  * 
- * my-app/
- * ├── public/             <-- 1. Create this folder at the top
- * │   └── assets/         <-- 2. Create this inside 'public'
- * │       ├── bed.png     <-- 3. Put your images here
- * │       └── cat.png
- * ├── index.html
- * └── package.json
- *
- * HOW TO USE THEM IN CODE:
- * 1. Just use the filename: imageUrl: 'bed.png'
- *    (The app automatically looks in the assets folder)
+ * OPTION 1: Manual GitHub Upload (Recommended for you)
+ * 1. Go to your repo on GitHub.
+ * 2. Open the 'public/assets' folder.
+ * 3. Upload your images (e.g. 'bed.png').
+ * 4. Use the filename below (imageUrl: 'bed.png').
  * 
- * OPTION 2: External Links (No folders needed)
- * 1. Upload to Imgur.com or GitHub.
- * 2. Use the link: imageUrl: 'https://imgur.com/example.png'
+ * OPTION 2: External Links
+ * You can also paste full URLs from Imgur/PostImages.
+ * (imageUrl: 'https://i.imgur.com/example.png')
  */
 
 export const INITIAL_WORDS: TracingWord[] = [

@@ -4,6 +4,7 @@ import TraceCanvas, { TraceCanvasHandle } from './components/TraceCanvas';
 import { INITIAL_WORDS, ICONS } from './constants';
 import { TracingWord, BrushColor } from './types';
 import { calculateScore } from './services/scoringService';
+import { Link } from 'lucide-react';
 
 const STORAGE_KEY = 'tinytracer_custom_words';
 const BG_STORAGE_KEY = 'tinytracer_bg_color';
@@ -38,7 +39,11 @@ const App: React.FC = () => {
   // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newWordText, setNewWordText] = useState('');
-  const [newWordImage, setNewWordImage] = useState<string | null>(null);
+  
+  // Image Input State
+  const [imageInputMethod, setImageInputMethod] = useState<'upload' | 'url'>('upload');
+  const [newWordImage, setNewWordImage] = useState<string | null>(null); // For base64 uploads
+  const [pastedUrl, setPastedUrl] = useState(''); // For external URLs
   const [isCompressing, setIsCompressing] = useState(false);
 
   // Image Loading State
@@ -196,8 +201,8 @@ const App: React.FC = () => {
           let width = img.width;
           let height = img.height;
           
-          // STRICTER LIMITS FOR 10MB APP LIMIT
-          const MAX_SIZE = 512; 
+          // INCREASED SIZE FOR CRISPER IMAGES (was 512)
+          const MAX_SIZE = 1024; 
 
           if (width > height) {
             if (width > MAX_SIZE) {
@@ -216,8 +221,8 @@ const App: React.FC = () => {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
           
-          // Lower quality (0.5) to ensure we respect storage limits
-          resolve(canvas.toDataURL('image/jpeg', 0.5)); 
+          // Quality 0.6 is good balance for 1024px
+          resolve(canvas.toDataURL('image/jpeg', 0.6)); 
         };
         img.onerror = (err) => reject(err);
       };
@@ -244,12 +249,14 @@ const App: React.FC = () => {
   const saveNewWord = () => {
     if (!newWordText.trim()) return;
 
+    const finalImage = imageInputMethod === 'upload' ? newWordImage : pastedUrl;
+
     const newWord: TracingWord = {
       id: Date.now().toString(),
       text: newWordText.toLowerCase(),
       category: 'My Words',
-      imageUrl: newWordImage || undefined,
-      emoji: !newWordImage ? '📝' : undefined
+      imageUrl: finalImage || undefined,
+      emoji: !finalImage ? '📝' : undefined
     };
 
     const savedCustom = localStorage.getItem(STORAGE_KEY);
@@ -261,13 +268,14 @@ const App: React.FC = () => {
       loadWords();
       setNewWordText('');
       setNewWordImage(null);
+      setPastedUrl('');
       setShowUploadModal(false);
       
       const newTotalLength = INITIAL_WORDS.length + updatedCustom.length;
       handleClear();
       setCurrentIndex(newTotalLength - 1);
     } catch (e) {
-      alert("Storage full! Please delete some custom words or try a smaller image.");
+      alert("Storage full! Please delete some custom words or use the 'Paste Link' option instead.");
     }
   };
 
@@ -297,7 +305,7 @@ const App: React.FC = () => {
     >
       
       {/* --- Top Bar --- */}
-      <header className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-white/50 backdrop-blur-sm shadow-sm z-20 relative">
+      <header className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-white/50 shadow-sm z-30 relative">
         <button 
           onClick={handlePrev}
           className="p-3 rounded-full bg-white/80 hover:bg-white active:scale-95 transition-transform shadow-sm"
@@ -355,44 +363,42 @@ const App: React.FC = () => {
       </header>
 
       {/* --- Main Area --- */}
-      <main className="flex-1 relative w-full flex flex-col items-center justify-center overflow-hidden touch-none">
+      <main className="flex-1 relative w-full flex flex-col items-center justify-end overflow-hidden touch-none">
         
-        {/* Background Layer: Image & Text */}
-        <div className="flex flex-col items-center justify-center gap-2 h-full w-full py-4 pointer-events-none select-none">
-          
-          {/* Visual Cue - No more "card" style, just the floating image */}
-          <div className="flex-none h-[25%] flex items-center justify-center w-full px-8 relative pointer-events-auto">
+        {/* Layer 1: Image (Top Half) */}
+        <div className="w-full flex-1 flex items-end justify-center pointer-events-none select-none z-0 relative px-4">
              {currentWord.imageUrl && !imgError && imageSrc ? (
                 <img 
                   key={imageSrc} 
                   src={imageSrc} 
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  className="h-[25vh] w-auto object-contain transform rotate-2 animate-in zoom-in-95 duration-500 drop-shadow-xl"
+                  // Increased size to 75vh (approx 150% bigger than 50vh)
+                  // Removed drop-shadow to reduce visual noise if interpreted as blur
+                  className="max-h-[75vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700"
                 />
               ) : (
-                <div className="flex items-center justify-center h-[25vh] w-[25vh] animate-in zoom-in-95 duration-500">
-                  <span className="text-[15vh] leading-none filter drop-shadow-xl transform hover:scale-110 transition-transform cursor-default select-none">
+                <div className="flex items-center justify-center opacity-30 pb-12">
+                  <span className="text-[30vh] leading-none">
                     {currentWord.emoji || '🎨'}
                   </span>
                 </div>
               )}
-          </div>
+        </div>
 
-          {/* Tracing Text */}
-          <div className="flex-1 flex items-center justify-center w-full min-h-0 pointer-events-none">
+        {/* Layer 2: Tracing Text (Bottom Half with Increased Overlap) */}
+        <div className="relative z-10 w-full flex justify-center pb-[5vh] -mt-[15vh] pointer-events-none select-none">
             <span 
               ref={textRef}
-              className="text-[28vh] sm:text-[40vh] text-slate-400/50 tracking-widest leading-none text-center whitespace-nowrap"
+              className="text-[20vh] sm:text-[25vh] text-slate-400/50 tracking-widest leading-none text-center whitespace-nowrap drop-shadow-sm"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
               {currentWord.text}
             </span>
-          </div>
         </div>
 
-        {/* Foreground Layer: Canvas */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none" />
+        {/* Layer 3: Drawing Canvas (Topmost) */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none z-20" />
         <TraceCanvas 
              ref={canvasRef} 
              color={activeColor} 
@@ -402,7 +408,7 @@ const App: React.FC = () => {
         
         {/* Score Modal */}
         {showScoreModal && (
-          <div className="absolute inset-0 z-40 bg-black/40 flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="absolute inset-0 z-40 bg-black/40 flex items-center justify-center animate-in fade-in duration-300">
             <div className="bg-white rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-4 transform scale-110">
               <div className="text-6xl animate-bounce">{getStars(score)}</div>
               <div className="text-crayon-blue font-black text-5xl">{score}%</div>
@@ -419,7 +425,7 @@ const App: React.FC = () => {
 
         {/* Background Color Picker Modal */}
         {showBgPicker && (
-          <div className="absolute inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-50 bg-black/20 flex items-center justify-center p-4">
              <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                <div className="flex justify-between items-center mb-6">
                  <h2 className="text-2xl font-bold text-slate-700 font-hand">Paper Color</h2>
@@ -445,44 +451,82 @@ const App: React.FC = () => {
 
         {/* Upload Modal (Add New Word) */}
         {showUploadModal && (
-          <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-50 bg-slate-900/80 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-slate-700 font-hand">Add New Word</h2>
                 <button onClick={() => setShowUploadModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
                   <ICONS.Close size={20} />
                 </button>
               </div>
 
-              <div className="space-y-6">
-                {/* Image Picker */}
-                <div 
-                  onClick={() => !isCompressing && fileInputRef.current?.click()}
-                  className={`border-4 border-dashed border-slate-200 rounded-2xl h-48 flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-crayon-blue transition-colors relative overflow-hidden group ${isCompressing ? 'opacity-50 cursor-wait' : ''}`}
-                >
-                  {isCompressing ? (
-                     <div className="flex flex-col items-center text-slate-400 gap-2">
-                        <span className="font-bold animate-pulse">Compressing...</span>
-                     </div>
-                  ) : newWordImage ? (
-                    <img src={newWordImage} alt="Preview" className="w-full h-full object-contain p-2" />
-                  ) : (
-                    <div className="flex flex-col items-center text-slate-400 gap-2">
-                      <ICONS.Image size={48} />
-                      <span className="font-bold">Tap to add photo</span>
+              <div className="space-y-4">
+                
+                {/* Method Toggles */}
+                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                  <button 
+                    onClick={() => setImageInputMethod('upload')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Upload Photo
+                  </button>
+                  <button 
+                    onClick={() => setImageInputMethod('url')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'url' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Paste Link
+                  </button>
+                </div>
+
+                {/* Image Input Area */}
+                <div className="h-48">
+                  {imageInputMethod === 'upload' ? (
+                     <div 
+                      onClick={() => !isCompressing && fileInputRef.current?.click()}
+                      className={`h-full border-4 border-dashed border-slate-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-crayon-blue transition-colors relative overflow-hidden group ${isCompressing ? 'opacity-50 cursor-wait' : ''}`}
+                    >
+                      {isCompressing ? (
+                         <div className="flex flex-col items-center text-slate-400 gap-2">
+                            <span className="font-bold animate-pulse">Compressing...</span>
+                         </div>
+                      ) : newWordImage ? (
+                        <img src={newWordImage} alt="Preview" className="w-full h-full object-contain p-2" />
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400 gap-2">
+                          <ICONS.Image size={48} />
+                          <span className="font-bold">Tap to add photo</span>
+                        </div>
+                      )}
+                      <input 
+                        ref={fileInputRef}
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload} 
+                        className="hidden" 
+                        disabled={isCompressing}
+                      />
+                      {newWordImage && !isCompressing && (
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-white font-bold">Change Photo</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                    className="hidden" 
-                    disabled={isCompressing}
-                  />
-                  {newWordImage && !isCompressing && (
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-white font-bold">Change Photo</span>
+                  ) : (
+                    <div className="h-full flex flex-col gap-2">
+                       <input 
+                          type="url" 
+                          placeholder="https://imgur.com/..."
+                          value={pastedUrl}
+                          onChange={(e) => setPastedUrl(e.target.value)}
+                          className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-crayon-blue outline-none font-sans text-sm text-slate-600"
+                        />
+                        <div className="flex-1 relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
+                           {pastedUrl ? (
+                             <img src={pastedUrl} alt="Preview" className="max-w-full max-h-full object-contain" onError={(e) => (e.currentTarget.style.opacity = '0.3')} />
+                           ) : (
+                             <span className="text-slate-300 text-sm font-bold">Preview will appear here</span>
+                           )}
+                        </div>
                     </div>
                   )}
                 </div>
@@ -502,7 +546,7 @@ const App: React.FC = () => {
 
                 <button 
                   onClick={saveNewWord}
-                  disabled={!newWordText || isCompressing}
+                  disabled={!newWordText || isCompressing || (imageInputMethod === 'url' && !pastedUrl) || (imageInputMethod === 'upload' && !newWordImage)}
                   className="w-full py-4 bg-crayon-blue text-white rounded-xl font-bold text-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 active:scale-95 transition-all"
                 >
                   Save Word
@@ -514,7 +558,7 @@ const App: React.FC = () => {
 
         {/* iOS Install Instruction Modal */}
         {showInstallModal && (
-          <div className="absolute inset-0 z-[60] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="absolute inset-0 z-[60] bg-slate-900/90 flex items-center justify-center p-6">
             <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
               <div className="flex justify-end">
                 <button onClick={() => setShowInstallModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
@@ -560,7 +604,7 @@ const App: React.FC = () => {
       </main>
 
       {/* --- Bottom Bar --- */}
-      <footer className="flex-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/50 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+      <footer className="flex-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           
           <div className="flex justify-between items-center px-2">

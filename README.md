@@ -1,20 +1,22 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# TinyTracer
 
-# Run and deploy your AI Studio app
+## How to add images manually
 
-This contains everything you need to run your app locally.
+Since you are uploading images directly to GitHub, follow these steps:
 
-View your app in AI Studio: https://ai.studio/apps/drive/1veWTm5T0o2N0p0ApS4t3ePxxQ1B0xxos
+1.  **Go to GitHub:** Open your repository in your browser.
+2.  **Navigate:** Click on the `public` folder, then the `assets` folder.
+3.  **Upload:**
+    *   Click **Add file** (top right) -> **Upload files**.
+    *   Drag and drop your images (e.g., `car.png`, `apple.jpg`).
+    *   Click **Commit changes**.
+4.  **Update Code:**
+    *   In `constants.ts`, simply use the filename:
+    ```typescript
+    {
+      text: 'car',
+      imageUrl: 'car.png' // The app automatically looks in public/assets/
+    }
+    ```
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Note:** It may take 1-2 minutes for new images to appear on the live site after you upload them to GitHub.
