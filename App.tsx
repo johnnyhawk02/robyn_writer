@@ -9,16 +9,19 @@ import { Link } from 'lucide-react';
 const STORAGE_KEY = 'tinytracer_custom_words';
 const BG_STORAGE_KEY = 'tinytracer_bg_color';
 
-// Safe pastel colors that ensure the grey tracing text remains visible
-const BG_COLORS = [
-  { hex: '#F8FAFC', name: 'Slate' }, // Default
-  { hex: '#FFFFFF', name: 'White' },
-  { hex: '#FFF1F2', name: 'Rose' },
-  { hex: '#FFF7ED', name: 'Peach' },
-  { hex: '#FEFCE8', name: 'Lemon' },
-  { hex: '#F0FDF4', name: 'Mint' },
-  { hex: '#EFF6FF', name: 'Sky' },
-  { hex: '#FAF5FF', name: 'Lavender' },
+// More vibrant palette + White/Grey defaults
+const PRESET_COLORS = [
+  '#FFFFFF', // White
+  '#F1F5F9', // Slate
+  '#FECACA', // Red 200
+  '#FED7AA', // Orange 200
+  '#FEF08A', // Yellow 200
+  '#BBF7D0', // Green 200
+  '#BAE6FD', // Sky 200
+  '#BFDBFE', // Blue 200
+  '#DDD6FE', // Violet 200
+  '#F5D0FE', // Fuchsia 200
+  '#FBCFE8', // Pink 200
 ];
 
 const App: React.FC = () => {
@@ -29,7 +32,7 @@ const App: React.FC = () => {
   const [isEraserMode, setIsEraserMode] = useState(false);
   
   // Appearance
-  const [bgColor, setBgColor] = useState(BG_COLORS[0].hex);
+  const [bgColor, setBgColor] = useState(PRESET_COLORS[1]);
   const [showBgPicker, setShowBgPicker] = useState(false);
 
   // Scoring
@@ -95,7 +98,10 @@ const App: React.FC = () => {
   const handleSetBgColor = (color: string) => {
     setBgColor(color);
     localStorage.setItem(BG_STORAGE_KEY, color);
-    setShowBgPicker(false);
+    // Don't close modal immediately for custom color picker
+    if (PRESET_COLORS.includes(color)) {
+      setShowBgPicker(false);
+    }
   };
 
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
@@ -373,8 +379,8 @@ const App: React.FC = () => {
                   src={imageSrc} 
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  // Reduced size to 60vh (80% of 75vh)
-                  className="max-h-[60vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700"
+                  // Reduced size to 54vh (10% smaller than previous 60vh)
+                  className="max-h-[54vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700"
                 />
               ) : (
                 <div className="flex items-center justify-center opacity-30 pb-12">
@@ -389,7 +395,7 @@ const App: React.FC = () => {
         <div className="relative z-10 w-full flex justify-center pb-[5vh] pointer-events-none select-none">
             <span 
               ref={textRef}
-              className="text-[20vh] sm:text-[25vh] text-slate-400/50 tracking-widest leading-none text-center whitespace-nowrap drop-shadow-sm"
+              className="text-[20vh] sm:text-[25vh] text-slate-300 tracking-widest leading-none text-center whitespace-nowrap drop-shadow-sm"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
               {currentWord.text}
@@ -397,7 +403,6 @@ const App: React.FC = () => {
         </div>
 
         {/* Layer 3: Drawing Canvas (Topmost) */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none z-20" />
         <TraceCanvas 
              ref={canvasRef} 
              color={activeColor} 
@@ -433,17 +438,32 @@ const App: React.FC = () => {
                  </button>
                </div>
                
-               <div className="grid grid-cols-4 gap-4">
-                 {BG_COLORS.map((c) => (
+               <div className="grid grid-cols-4 gap-4 mb-4">
+                 {PRESET_COLORS.map((hex) => (
                    <button
-                     key={c.name}
-                     onClick={() => handleSetBgColor(c.hex)}
-                     className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === c.hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
-                     style={{ backgroundColor: c.hex }}
-                     aria-label={`Select ${c.name} background`}
+                     key={hex}
+                     onClick={() => handleSetBgColor(hex)}
+                     className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
+                     style={{ backgroundColor: hex }}
+                     aria-label={`Select background ${hex}`}
                    />
                  ))}
+                 
+                 {/* Custom Color Picker Button */}
+                 <div className="relative w-full aspect-square rounded-full shadow-inner border-4 border-slate-100 overflow-hidden group">
+                   <input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => handleSetBgColor(e.target.value)}
+                    className="absolute inset-[-50%] w-[200%] h-[200%] cursor-pointer p-0 border-0"
+                    title="Choose custom color"
+                   />
+                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-white/20 group-hover:bg-transparent">
+                      <ICONS.Palette size={20} className="text-slate-600 mix-blend-multiply" />
+                   </div>
+                 </div>
                </div>
+               <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Tap colorful circle for custom!</p>
              </div>
           </div>
         )}

@@ -119,7 +119,7 @@ const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, li
   return (
     <canvas
       ref={canvasRef}
-      className="absolute top-0 left-0 touch-none z-10 cursor-crosshair"
+      className="absolute top-0 left-0 touch-none z-10 cursor-crosshair bg-transparent"
       onPointerDown={startDrawing}
       onPointerMove={draw}
       onPointerUp={stopDrawing}
