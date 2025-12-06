@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import TraceCanvas, { TraceCanvasHandle } from './components/TraceCanvas';
-import { INITIAL_WORDS, PALETTE, ICONS } from './constants';
+import { INITIAL_WORDS, ICONS } from './constants';
 import { TracingWord, BrushColor } from './types';
 import { calculateScore } from './services/scoringService';
 
@@ -11,7 +11,8 @@ const App: React.FC = () => {
   // --- State ---
   const [words, setWords] = useState<TracingWord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [brushColor, setBrushColor] = useState<string>(BrushColor.Black);
+  // Brush color is always black now
+  const brushColor = BrushColor.Black;
   const [isEraserMode, setIsEraserMode] = useState(false);
   
   // Scoring
@@ -416,25 +417,6 @@ const App: React.FC = () => {
               <ICONS.Trophy size={28} className="fill-white" />
               <span className="font-bold text-lg">Check!</span>
             </button>
-          </div>
-
-          <div className="flex justify-between items-center bg-slate-100 rounded-3xl p-2 gap-2 overflow-x-auto no-scrollbar">
-            {PALETTE.map((p) => (
-              <button
-                key={p.name}
-                onClick={() => {
-                  setBrushColor(p.color);
-                  setIsEraserMode(false);
-                }}
-                className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full border-4 transition-transform duration-200 ${
-                  brushColor === p.color && !isEraserMode
-                    ? 'scale-110 border-slate-400 shadow-md' 
-                    : 'border-white scale-100'
-                }`}
-                style={{ backgroundColor: p.color }}
-                aria-label={`Select ${p.name}`}
-              />
-            ))}
           </div>
 
         </div>
