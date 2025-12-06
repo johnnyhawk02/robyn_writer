@@ -321,7 +321,11 @@ const App: React.FC = () => {
         </button>
 
         <div className="flex flex-col items-center">
-          <span className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-1">
+          {/* 
+              Changed to text-black/40 + mix-blend-multiply to ensure it looks like 
+              a darkened version of the background color (ink effect).
+          */}
+          <span className="text-xs font-bold text-black/40 tracking-widest uppercase mb-1 mix-blend-multiply">
             {currentWord.category}
           </span>
           <div className="flex gap-1">
@@ -384,7 +388,8 @@ const App: React.FC = () => {
                 />
               ) : (
                 <div className="flex items-center justify-center opacity-30 pb-12">
-                  <span className="text-[30vh] leading-none">
+                   {/* Emoji placeholder: text-black/20 + multiply for subtle watermark effect */}
+                  <span className="text-[30vh] leading-none mix-blend-multiply text-black/20">
                     {currentWord.emoji || '🎨'}
                   </span>
                 </div>
@@ -395,7 +400,8 @@ const App: React.FC = () => {
         <div className="relative z-10 w-full flex justify-center pb-[5vh] pointer-events-none select-none">
             <span 
               ref={textRef}
-              className="text-[20vh] sm:text-[25vh] text-slate-300 tracking-widest leading-none text-center whitespace-nowrap drop-shadow-sm"
+              // Changed from text-black/50 to text-black/15 for a much fainter watermark look
+              className="text-[20vh] sm:text-[25vh] text-black/15 tracking-widest leading-none text-center whitespace-nowrap mix-blend-multiply"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
               {currentWord.text}

@@ -12,9 +12,3 @@ Thumbs.db
 
 # Environment variables
 .env
-
-# Local Assets
-# Ignore all files in this folder to save space...
-public/assets/*
-# ...BUT keep the folder itself (and this specific file) so it exists in the repo
-!public/assets/.gitkeep
