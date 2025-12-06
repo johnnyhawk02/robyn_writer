@@ -1,6 +1,6 @@
 
 import { BrushColor, TracingWord } from './types';
-import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X, Download, SquareArrowUp } from 'lucide-react';
+import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X, Download, SquareArrowUp, Palette } from 'lucide-react';
 
 /* 
  * ==========================================
@@ -100,5 +100,6 @@ export const ICONS = {
   Image: ImageIcon,
   Close: X,
   Download,
-  ShareIOS: SquareArrowUp
+  ShareIOS: SquareArrowUp,
+  Palette
 };

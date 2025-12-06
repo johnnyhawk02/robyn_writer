@@ -6,6 +6,19 @@ import { TracingWord, BrushColor } from './types';
 import { calculateScore } from './services/scoringService';
 
 const STORAGE_KEY = 'tinytracer_custom_words';
+const BG_STORAGE_KEY = 'tinytracer_bg_color';
+
+// Safe pastel colors that ensure the grey tracing text remains visible
+const BG_COLORS = [
+  { hex: '#F8FAFC', name: 'Slate' }, // Default
+  { hex: '#FFFFFF', name: 'White' },
+  { hex: '#FFF1F2', name: 'Rose' },
+  { hex: '#FFF7ED', name: 'Peach' },
+  { hex: '#FEFCE8', name: 'Lemon' },
+  { hex: '#F0FDF4', name: 'Mint' },
+  { hex: '#EFF6FF', name: 'Sky' },
+  { hex: '#FAF5FF', name: 'Lavender' },
+];
 
 const App: React.FC = () => {
   // --- State ---
@@ -14,6 +27,10 @@ const App: React.FC = () => {
   const brushColor = BrushColor.Black;
   const [isEraserMode, setIsEraserMode] = useState(false);
   
+  // Appearance
+  const [bgColor, setBgColor] = useState(BG_COLORS[0].hex);
+  const [showBgPicker, setShowBgPicker] = useState(false);
+
   // Scoring
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [score, setScore] = useState(0);
@@ -40,6 +57,7 @@ const App: React.FC = () => {
   // --- Initialization ---
   useEffect(() => {
     loadWords();
+    loadSettings();
     const ua = window.navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isStandalone = 
@@ -60,6 +78,19 @@ const App: React.FC = () => {
       }
     }
     setWords([...INITIAL_WORDS, ...customWords]);
+  };
+
+  const loadSettings = () => {
+    const savedBg = localStorage.getItem(BG_STORAGE_KEY);
+    if (savedBg) {
+      setBgColor(savedBg);
+    }
+  };
+
+  const handleSetBgColor = (color: string) => {
+    setBgColor(color);
+    localStorage.setItem(BG_STORAGE_KEY, color);
+    setShowBgPicker(false);
   };
 
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
@@ -260,13 +291,16 @@ const App: React.FC = () => {
   if (!currentWord) return null;
 
   return (
-    <div className="flex flex-col h-full w-full bg-slate-50 select-none">
+    <div 
+      className="flex flex-col h-full w-full select-none transition-colors duration-500 ease-in-out"
+      style={{ backgroundColor: bgColor }}
+    >
       
       {/* --- Top Bar --- */}
-      <header className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-white shadow-sm z-20 relative">
+      <header className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-white/50 backdrop-blur-sm shadow-sm z-20 relative">
         <button 
           onClick={handlePrev}
-          className="p-3 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 transition-transform"
+          className="p-3 rounded-full bg-white/80 hover:bg-white active:scale-95 transition-transform shadow-sm"
           aria-label="Previous Word"
         >
           <ICONS.Prev size={32} className="text-slate-600" />
@@ -280,7 +314,7 @@ const App: React.FC = () => {
             {words.map((_, idx) => (
                <div 
                  key={idx} 
-                 className={`h-2 w-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-crayon-blue' : 'bg-slate-200'}`}
+                 className={`h-2 w-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-crayon-blue' : 'bg-slate-300'}`}
                />
             ))}
           </div>
@@ -290,12 +324,19 @@ const App: React.FC = () => {
            {isIOSBrowser && (
              <button 
                onClick={() => setShowInstallModal(true)}
-               className="p-3 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 transition-transform"
+               className="p-3 rounded-full bg-white/80 text-slate-600 hover:bg-white active:scale-95 transition-transform shadow-sm"
                title="Install App"
              >
                <ICONS.Download size={24} />
              </button>
            )}
+           <button 
+             onClick={() => setShowBgPicker(true)}
+             className="p-3 rounded-full bg-white/80 text-slate-600 hover:bg-white active:scale-95 transition-transform shadow-sm"
+             aria-label="Change Background"
+           >
+             <ICONS.Palette size={24} />
+           </button>
            <button 
              onClick={() => setShowUploadModal(true)}
              className="p-3 rounded-full bg-crayon-blue/10 text-crayon-blue hover:bg-crayon-blue/20 active:scale-95 transition-transform"
@@ -305,7 +346,7 @@ const App: React.FC = () => {
            </button>
            <button 
             onClick={handleNext}
-            className="p-3 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 transition-transform"
+            className="p-3 rounded-full bg-white/80 hover:bg-white active:scale-95 transition-transform shadow-sm"
             aria-label="Next Word"
           >
             <ICONS.Next size={32} className="text-slate-600" />
@@ -319,20 +360,19 @@ const App: React.FC = () => {
         {/* Background Layer: Image & Text */}
         <div className="flex flex-col items-center justify-center gap-2 h-full w-full py-4 pointer-events-none select-none">
           
-          {/* Visual Cue */}
+          {/* Visual Cue - No more "card" style, just the floating image */}
           <div className="flex-none h-[25%] flex items-center justify-center w-full px-8 relative pointer-events-auto">
              {currentWord.imageUrl && !imgError && imageSrc ? (
                 <img 
-                  key={imageSrc} // Forces React to remount image on source change
+                  key={imageSrc} 
                   src={imageSrc} 
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  className="h-[25vh] w-auto object-contain rounded-xl shadow-lg border-4 border-white transform rotate-2 animate-in zoom-in-95 duration-500 bg-white"
+                  className="h-[25vh] w-auto object-contain transform rotate-2 animate-in zoom-in-95 duration-500 drop-shadow-xl"
                 />
               ) : (
-                /* Beautiful Fallback: Emoji Sticker */
-                <div className="flex items-center justify-center h-[25vh] w-[25vh] bg-white rounded-full shadow-lg border-4 border-slate-100 animate-in zoom-in-95 duration-500">
-                  <span className="text-[12vh] leading-none filter drop-shadow-sm transform hover:scale-110 transition-transform cursor-default select-none">
+                <div className="flex items-center justify-center h-[25vh] w-[25vh] animate-in zoom-in-95 duration-500">
+                  <span className="text-[15vh] leading-none filter drop-shadow-xl transform hover:scale-110 transition-transform cursor-default select-none">
                     {currentWord.emoji || '🎨'}
                   </span>
                 </div>
@@ -343,7 +383,7 @@ const App: React.FC = () => {
           <div className="flex-1 flex items-center justify-center w-full min-h-0 pointer-events-none">
             <span 
               ref={textRef}
-              className="text-[28vh] sm:text-[40vh] text-slate-300 opacity-80 tracking-widest leading-none text-center whitespace-nowrap"
+              className="text-[28vh] sm:text-[40vh] text-slate-400/50 tracking-widest leading-none text-center whitespace-nowrap"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
               {currentWord.text}
@@ -374,6 +414,32 @@ const App: React.FC = () => {
                 Try Again
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Background Color Picker Modal */}
+        {showBgPicker && (
+          <div className="absolute inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
+             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+               <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-2xl font-bold text-slate-700 font-hand">Paper Color</h2>
+                 <button onClick={() => setShowBgPicker(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                   <ICONS.Close size={20} />
+                 </button>
+               </div>
+               
+               <div className="grid grid-cols-4 gap-4">
+                 {BG_COLORS.map((c) => (
+                   <button
+                     key={c.name}
+                     onClick={() => handleSetBgColor(c.hex)}
+                     className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === c.hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
+                     style={{ backgroundColor: c.hex }}
+                     aria-label={`Select ${c.name} background`}
+                   />
+                 ))}
+               </div>
+             </div>
           </div>
         )}
 
@@ -494,21 +560,21 @@ const App: React.FC = () => {
       </main>
 
       {/* --- Bottom Bar --- */}
-      <footer className="flex-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+      <footer className="flex-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/50 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           
           <div className="flex justify-between items-center px-2">
             <div className="flex gap-2">
                <button
                 onClick={toggleEraser}
-                className={`p-4 rounded-2xl flex items-center gap-2 transition-all ${isEraserMode ? 'bg-slate-800 text-white shadow-inner' : 'bg-slate-100 text-slate-600'}`}
+                className={`p-4 rounded-2xl flex items-center gap-2 transition-all shadow-sm ${isEraserMode ? 'bg-slate-800 text-white shadow-inner' : 'bg-white/80 text-slate-600 hover:bg-white'}`}
               >
                 <ICONS.Eraser size={24} />
                 <span className="font-bold text-sm hidden sm:inline">Eraser</span>
               </button>
                <button
                 onClick={handleClear}
-                className="p-4 rounded-2xl bg-red-100 text-red-500 hover:bg-red-200 active:scale-95 transition-all flex items-center gap-2"
+                className="p-4 rounded-2xl bg-red-100 text-red-500 hover:bg-red-200 active:scale-95 transition-all flex items-center gap-2 shadow-sm"
               >
                 <ICONS.Trash size={24} />
               </button>
