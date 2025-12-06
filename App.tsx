@@ -373,9 +373,8 @@ const App: React.FC = () => {
                   src={imageSrc} 
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  // Increased size to 75vh (approx 150% bigger than 50vh)
-                  // Removed drop-shadow to reduce visual noise if interpreted as blur
-                  className="max-h-[75vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700"
+                  // Reduced size to 60vh (80% of 75vh)
+                  className="max-h-[60vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700"
                 />
               ) : (
                 <div className="flex items-center justify-center opacity-30 pb-12">
