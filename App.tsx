@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import TraceCanvas, { TraceCanvasHandle } from './components/TraceCanvas';
 import { INITIAL_WORDS, ICONS } from './constants';
 import { TracingWord, BrushColor } from './types';
-import { calculateScore } from './services/scoringService';
+// import { calculateScore } from './services/scoringService'; // Score feature removed from UI
 import { Link } from 'lucide-react';
 
 const STORAGE_KEY = 'tinytracer_custom_words';
@@ -34,10 +34,6 @@ const App: React.FC = () => {
   // Appearance
   const [bgColor, setBgColor] = useState(PRESET_COLORS[1]);
   const [showBgPicker, setShowBgPicker] = useState(false);
-
-  // Scoring
-  const [showScoreModal, setShowScoreModal] = useState(false);
-  const [score, setScore] = useState(0);
 
   // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -165,7 +161,6 @@ const App: React.FC = () => {
   // --- Handlers: Canvas ---
   const handleClear = () => {
     canvasRef.current?.clearCanvas();
-    setShowScoreModal(false);
   };
 
   const handleNext = () => {
@@ -182,17 +177,6 @@ const App: React.FC = () => {
     setIsEraserMode(!isEraserMode);
   };
 
-  const handleCheckScore = () => {
-    const canvas = canvasRef.current?.getCanvas();
-    const textElement = textRef.current;
-    
-    if (canvas && textElement) {
-      const result = calculateScore(canvas, currentWord.text, textElement);
-      setScore(result);
-      setShowScoreModal(true);
-    }
-  };
-
   // --- Handlers: Upload with Compression ---
   
   const compressImage = (file: File): Promise<string> => {
@@ -207,7 +191,7 @@ const App: React.FC = () => {
           let width = img.width;
           let height = img.height;
           
-          // INCREASED SIZE FOR CRISPER IMAGES (was 512)
+          // INCREASED SIZE FOR CRISPER IMAGES
           const MAX_SIZE = 1024; 
 
           if (width > height) {
@@ -227,7 +211,6 @@ const App: React.FC = () => {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
           
-          // Quality 0.6 is good balance for 1024px
           resolve(canvas.toDataURL('image/jpeg', 0.6)); 
         };
         img.onerror = (err) => reject(err);
@@ -289,377 +272,337 @@ const App: React.FC = () => {
   const activeColor = brushColor;
   const activeLineWidth = isEraserMode ? 40 : 16; 
 
-  const getStars = (s: number) => {
-    if (s >= 90) return '⭐⭐⭐';
-    if (s >= 70) return '⭐⭐';
-    return '⭐';
-  };
-  
-  const getMessage = (s: number) => {
-    if (s >= 90) return 'Perfect!';
-    if (s >= 70) return 'Great Job!';
-    if (s >= 50) return 'Good Try!';
-    return 'Keep Going!';
-  };
+  const floatBtnClass = "p-3 rounded-full bg-white/80 shadow-lg backdrop-blur-sm hover:bg-white active:scale-95 transition-all z-50 flex items-center justify-center";
+  const activeEraserClass = "bg-slate-800 text-white shadow-xl scale-110 ring-2 ring-white";
 
   if (!currentWord) return null;
 
   return (
     <div 
-      className="flex flex-col h-full w-full select-none transition-colors duration-500 ease-in-out"
+      className="relative h-full w-full select-none overflow-hidden touch-none transition-colors duration-500"
       style={{ backgroundColor: bgColor }}
     >
       
-      {/* --- Top Bar --- */}
-      <header className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-white/50 shadow-sm z-30 relative">
-        <button 
-          onClick={handlePrev}
-          className="p-3 rounded-full bg-white/80 hover:bg-white active:scale-95 transition-transform shadow-sm"
-          aria-label="Previous Word"
-        >
-          <ICONS.Prev size={32} className="text-slate-600" />
-        </button>
+      {/* --- Floating UI Controls Layer --- */}
+      {/* pointer-events-none ensures touches pass through to canvas where there are no buttons */}
+      <div className="absolute inset-0 z-50 pointer-events-none p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col justify-between">
+          
+          {/* Top Row */}
+          <div className="flex justify-between items-start pointer-events-auto">
+              
+              {/* Left Group: Settings & Add */}
+              <div className="flex flex-col gap-3">
+                 <button 
+                   onClick={() => setShowBgPicker(true)}
+                   className={floatBtnClass}
+                   aria-label="Change Color"
+                 >
+                   <ICONS.Palette size={24} className="text-slate-600" />
+                 </button>
+                 <button 
+                   onClick={() => setShowUploadModal(true)}
+                   className={floatBtnClass}
+                   aria-label="Add Word"
+                 >
+                   <ICONS.Plus size={24} className="text-crayon-blue" />
+                 </button>
+                 {isIOSBrowser && (
+                   <button onClick={() => setShowInstallModal(true)} className={floatBtnClass} aria-label="Install App">
+                     <ICONS.Download size={24} className="text-slate-600" />
+                   </button>
+                 )}
+              </div>
 
-        <div className="flex flex-col items-center">
-          {/* 
-              Changed to text-black/40 + mix-blend-multiply to ensure it looks like 
-              a darkened version of the background color (ink effect).
-          */}
-          <span className="text-xs font-bold text-black/40 tracking-widest uppercase mb-1 mix-blend-multiply">
-            {currentWord.category}
-          </span>
-          <div className="flex gap-1">
-            {words.map((_, idx) => (
-               <div 
-                 key={idx} 
-                 className={`h-2 w-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-crayon-blue' : 'bg-slate-300'}`}
-               />
-            ))}
+              {/* Center Group: Category (Minimal) */}
+              <div className="flex flex-col items-center pt-2 opacity-60">
+                <span className="text-xs font-bold text-black/40 tracking-widest uppercase mb-1 mix-blend-multiply">
+                  {currentWord.category}
+                </span>
+                 <div className="flex gap-1">
+                    {words.map((_, idx) => (
+                       <div 
+                         key={idx} 
+                         className={`h-2 w-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-black/50' : 'bg-black/10'}`}
+                       />
+                    ))}
+                </div>
+              </div>
+
+              {/* Right Group: Tools */}
+              <div className="flex flex-col gap-3 items-end">
+                 <button
+                    onClick={toggleEraser}
+                    className={`${floatBtnClass} ${isEraserMode ? activeEraserClass : 'text-slate-600'}`}
+                    aria-label="Toggle Eraser"
+                  >
+                    <ICONS.Eraser size={24} />
+                  </button>
+                 <button
+                    onClick={handleClear}
+                    className={`${floatBtnClass} text-red-500`}
+                    aria-label="Clear Canvas"
+                  >
+                    <ICONS.Trash size={24} />
+                  </button>
+              </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-           {isIOSBrowser && (
+          {/* Navigation Arrows (Vertically Centered) */}
+          <div className="absolute top-1/2 left-4 -translate-y-1/2 pointer-events-auto">
              <button 
-               onClick={() => setShowInstallModal(true)}
-               className="p-3 rounded-full bg-white/80 text-slate-600 hover:bg-white active:scale-95 transition-transform shadow-sm"
-               title="Install App"
-             >
-               <ICONS.Download size={24} />
-             </button>
-           )}
-           <button 
-             onClick={() => setShowBgPicker(true)}
-             className="p-3 rounded-full bg-white/80 text-slate-600 hover:bg-white active:scale-95 transition-transform shadow-sm"
-             aria-label="Change Background"
-           >
-             <ICONS.Palette size={24} />
-           </button>
-           <button 
-             onClick={() => setShowUploadModal(true)}
-             className="p-3 rounded-full bg-crayon-blue/10 text-crayon-blue hover:bg-crayon-blue/20 active:scale-95 transition-transform"
-             aria-label="Add Word"
-           >
-             <ICONS.Plus size={24} />
-           </button>
-           <button 
-            onClick={handleNext}
-            className="p-3 rounded-full bg-white/80 hover:bg-white active:scale-95 transition-transform shadow-sm"
-            aria-label="Next Word"
-          >
-            <ICONS.Next size={32} className="text-slate-600" />
-          </button>
-        </div>
-      </header>
+                onClick={handlePrev}
+                className="p-4 rounded-full bg-white/60 hover:bg-white/90 shadow-lg backdrop-blur-sm active:scale-95 transition-all text-slate-600"
+                aria-label="Previous Word"
+              >
+                <ICONS.Prev size={32} />
+              </button>
+          </div>
+          
+          <div className="absolute top-1/2 right-4 -translate-y-1/2 pointer-events-auto">
+             <button 
+                onClick={handleNext}
+                className="p-4 rounded-full bg-white/60 hover:bg-white/90 shadow-lg backdrop-blur-sm active:scale-95 transition-all text-slate-600"
+                aria-label="Next Word"
+              >
+                <ICONS.Next size={32} />
+              </button>
+          </div>
 
-      {/* --- Main Area --- */}
-      <main className="flex-1 relative w-full flex flex-col items-center justify-end overflow-hidden touch-none">
+      </div>
+
+      {/* --- Main Content Area (Background Layer) --- */}
+      <main className="absolute inset-0 w-full h-full flex flex-col items-center justify-center z-0">
         
-        {/* Layer 1: Image (Top Half) */}
-        <div className="w-full flex-1 flex items-end justify-center pointer-events-none select-none z-0 relative px-4">
+        {/* Top Half: Image */}
+        <div className="flex-1 w-full flex items-end justify-center pb-4 sm:pb-8 px-12">
              {currentWord.imageUrl && !imgError && imageSrc ? (
                 <img 
                   key={imageSrc} 
                   src={imageSrc} 
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  // Reduced size to 54vh (10% smaller than previous 60vh)
-                  className="max-h-[54vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700"
+                  className="max-h-[40vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700 drop-shadow-sm select-none pointer-events-none" 
                 />
               ) : (
-                <div className="flex items-center justify-center opacity-30 pb-12">
-                   {/* Emoji placeholder: text-black/20 + multiply for subtle watermark effect */}
-                  <span className="text-[30vh] leading-none mix-blend-multiply text-black/20">
+                <div className="flex items-center justify-center opacity-30">
+                  <span className="text-[25vh] leading-none mix-blend-multiply text-black/20 select-none pointer-events-none">
                     {currentWord.emoji || '🎨'}
                   </span>
                 </div>
               )}
         </div>
 
-        {/* Layer 2: Tracing Text (Bottom Half) */}
-        <div className="relative z-10 w-full flex justify-center pb-[5vh] pointer-events-none select-none">
+        {/* Bottom Half: Text */}
+        <div className="flex-1 w-full flex items-start justify-center pt-2 sm:pt-4">
             <span 
               ref={textRef}
-              // Changed from text-black/50 to text-black/15 for a much fainter watermark look
-              className="text-[20vh] sm:text-[25vh] text-black/15 tracking-widest leading-none text-center whitespace-nowrap mix-blend-multiply"
+              className="text-[20vh] sm:text-[25vh] text-black/15 tracking-widest leading-none text-center whitespace-nowrap mix-blend-multiply select-none pointer-events-none"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
               {currentWord.text}
             </span>
         </div>
 
-        {/* Layer 3: Drawing Canvas (Topmost) */}
-        <TraceCanvas 
-             ref={canvasRef} 
-             color={activeColor} 
-             lineWidth={activeLineWidth}
-             isEraser={isEraserMode}
-        />
-        
-        {/* Score Modal */}
-        {showScoreModal && (
-          <div className="absolute inset-0 z-40 bg-black/40 flex items-center justify-center animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-4 transform scale-110">
-              <div className="text-6xl animate-bounce">{getStars(score)}</div>
-              <div className="text-crayon-blue font-black text-5xl">{score}%</div>
-              <div className="text-slate-500 text-xl font-bold">{getMessage(score)}</div>
-              <button 
-                onClick={() => setShowScoreModal(false)}
-                className="mt-4 px-8 py-3 bg-crayon-green text-white rounded-xl font-bold text-lg hover:bg-green-600 active:scale-95 transition-all"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Background Color Picker Modal */}
-        {showBgPicker && (
-          <div className="absolute inset-0 z-50 bg-black/20 flex items-center justify-center p-4">
-             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-               <div className="flex justify-between items-center mb-6">
-                 <h2 className="text-2xl font-bold text-slate-700 font-hand">Paper Color</h2>
-                 <button onClick={() => setShowBgPicker(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
-                   <ICONS.Close size={20} />
-                 </button>
-               </div>
-               
-               <div className="grid grid-cols-4 gap-4 mb-4">
-                 {PRESET_COLORS.map((hex) => (
-                   <button
-                     key={hex}
-                     onClick={() => handleSetBgColor(hex)}
-                     className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
-                     style={{ backgroundColor: hex }}
-                     aria-label={`Select background ${hex}`}
-                   />
-                 ))}
-                 
-                 {/* Custom Color Picker Button */}
-                 <div className="relative w-full aspect-square rounded-full shadow-inner border-4 border-slate-100 overflow-hidden group">
-                   <input
-                    type="color"
-                    value={bgColor}
-                    onChange={(e) => handleSetBgColor(e.target.value)}
-                    className="absolute inset-[-50%] w-[200%] h-[200%] cursor-pointer p-0 border-0"
-                    title="Choose custom color"
-                   />
-                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-white/20 group-hover:bg-transparent">
-                      <ICONS.Palette size={20} className="text-slate-600 mix-blend-multiply" />
-                   </div>
-                 </div>
-               </div>
-               <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Tap colorful circle for custom!</p>
-             </div>
-          </div>
-        )}
-
-        {/* Upload Modal (Add New Word) */}
-        {showUploadModal && (
-          <div className="absolute inset-0 z-50 bg-slate-900/80 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-slate-700 font-hand">Add New Word</h2>
-                <button onClick={() => setShowUploadModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
-                  <ICONS.Close size={20} />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                
-                {/* Method Toggles */}
-                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-                  <button 
-                    onClick={() => setImageInputMethod('upload')}
-                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Upload Photo
-                  </button>
-                  <button 
-                    onClick={() => setImageInputMethod('url')}
-                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'url' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    Paste Link
-                  </button>
-                </div>
-
-                {/* Image Input Area */}
-                <div className="h-48">
-                  {imageInputMethod === 'upload' ? (
-                     <div 
-                      onClick={() => !isCompressing && fileInputRef.current?.click()}
-                      className={`h-full border-4 border-dashed border-slate-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-crayon-blue transition-colors relative overflow-hidden group ${isCompressing ? 'opacity-50 cursor-wait' : ''}`}
-                    >
-                      {isCompressing ? (
-                         <div className="flex flex-col items-center text-slate-400 gap-2">
-                            <span className="font-bold animate-pulse">Compressing...</span>
-                         </div>
-                      ) : newWordImage ? (
-                        <img src={newWordImage} alt="Preview" className="w-full h-full object-contain p-2" />
-                      ) : (
-                        <div className="flex flex-col items-center text-slate-400 gap-2">
-                          <ICONS.Image size={48} />
-                          <span className="font-bold">Tap to add photo</span>
-                        </div>
-                      )}
-                      <input 
-                        ref={fileInputRef}
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleImageUpload} 
-                        className="hidden" 
-                        disabled={isCompressing}
-                      />
-                      {newWordImage && !isCompressing && (
-                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-white font-bold">Change Photo</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col gap-2">
-                       <input 
-                          type="url" 
-                          placeholder="https://imgur.com/..."
-                          value={pastedUrl}
-                          onChange={(e) => setPastedUrl(e.target.value)}
-                          className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-crayon-blue outline-none font-sans text-sm text-slate-600"
-                        />
-                        <div className="flex-1 relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
-                           {pastedUrl ? (
-                             <img src={pastedUrl} alt="Preview" className="max-w-full max-h-full object-contain" onError={(e) => (e.currentTarget.style.opacity = '0.3')} />
-                           ) : (
-                             <span className="text-slate-300 text-sm font-bold">Preview will appear here</span>
-                           )}
-                        </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Word Input */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-500 uppercase mb-2">Word to Trace</label>
-                  <input 
-                    type="text" 
-                    value={newWordText}
-                    onChange={(e) => setNewWordText(e.target.value)}
-                    placeholder="e.g. Daddy"
-                    className="w-full p-4 text-3xl font-hand text-center border-2 border-slate-200 rounded-xl focus:border-crayon-blue focus:outline-none"
-                    maxLength={10}
-                  />
-                </div>
-
-                <button 
-                  onClick={saveNewWord}
-                  disabled={!newWordText || isCompressing || (imageInputMethod === 'url' && !pastedUrl) || (imageInputMethod === 'upload' && !newWordImage)}
-                  className="w-full py-4 bg-crayon-blue text-white rounded-xl font-bold text-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 active:scale-95 transition-all"
-                >
-                  Save Word
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* iOS Install Instruction Modal */}
-        {showInstallModal && (
-          <div className="absolute inset-0 z-[60] bg-slate-900/90 flex items-center justify-center p-6">
-            <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
-              <div className="flex justify-end">
-                <button onClick={() => setShowInstallModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
-                  <ICONS.Close size={20} />
-                </button>
-              </div>
-              
-              <div className="flex justify-center mb-6">
-                 <div className="p-4 bg-crayon-blue/10 rounded-full">
-                   <ICONS.Download size={48} className="text-crayon-blue" />
-                 </div>
-              </div>
-
-              <h2 className="text-2xl font-bold text-slate-800 mb-2 font-hand">Install TinyTracer</h2>
-              <p className="text-slate-500 mb-8">Get the full screen experience for your child!</p>
-
-              <div className="space-y-6 text-left bg-slate-50 p-6 rounded-2xl">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <ICONS.ShareIOS size={24} className="text-crayon-blue" />
-                  </div>
-                  <span className="font-bold text-slate-600">1. Tap the <span className="text-black">Share</span> button</span>
-                </div>
-                <div className="h-px bg-slate-200 w-full" />
-                <div className="flex items-center gap-4">
-                   <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <ICONS.Plus size={24} className="text-crayon-blue" />
-                   </div>
-                  <span className="font-bold text-slate-600">2. Select <span className="text-black">Add to Home Screen</span></span>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => setShowInstallModal(false)}
-                className="mt-8 w-full py-3 bg-crayon-blue text-white rounded-xl font-bold text-lg shadow-lg hover:bg-blue-600"
-              >
-                Got it!
-              </button>
-            </div>
-          </div>
-        )}
-
       </main>
 
-      {/* --- Bottom Bar --- */}
-      <footer className="flex-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
-        <div className="max-w-3xl mx-auto flex flex-col gap-4">
-          
-          <div className="flex justify-between items-center px-2">
-            <div className="flex gap-2">
-               <button
-                onClick={toggleEraser}
-                className={`p-4 rounded-2xl flex items-center gap-2 transition-all shadow-sm ${isEraserMode ? 'bg-slate-800 text-white shadow-inner' : 'bg-white/80 text-slate-600 hover:bg-white'}`}
-              >
-                <ICONS.Eraser size={24} />
-                <span className="font-bold text-sm hidden sm:inline">Eraser</span>
-              </button>
-               <button
-                onClick={handleClear}
-                className="p-4 rounded-2xl bg-red-100 text-red-500 hover:bg-red-200 active:scale-95 transition-all flex items-center gap-2 shadow-sm"
-              >
-                <ICONS.Trash size={24} />
+      {/* --- Drawing Canvas (Top Layer) --- */}
+      <TraceCanvas 
+           ref={canvasRef} 
+           color={activeColor} 
+           lineWidth={activeLineWidth}
+           isEraser={isEraserMode}
+      />
+      
+      {/* Background Color Picker Modal */}
+      {showBgPicker && (
+        <div className="absolute inset-0 z-[60] bg-black/20 flex items-center justify-center p-4">
+           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="text-2xl font-bold text-slate-700 font-hand">Paper Color</h2>
+               <button onClick={() => setShowBgPicker(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                 <ICONS.Close size={20} />
+               </button>
+             </div>
+             
+             <div className="grid grid-cols-4 gap-4 mb-4">
+               {PRESET_COLORS.map((hex) => (
+                 <button
+                   key={hex}
+                   onClick={() => handleSetBgColor(hex)}
+                   className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
+                   style={{ backgroundColor: hex }}
+                   aria-label={`Select background ${hex}`}
+                 />
+               ))}
+               
+               {/* Custom Color Picker Button */}
+               <div className="relative w-full aspect-square rounded-full shadow-inner border-4 border-slate-100 overflow-hidden group">
+                 <input
+                  type="color"
+                  value={bgColor}
+                  onChange={(e) => handleSetBgColor(e.target.value)}
+                  className="absolute inset-[-50%] w-[200%] h-[200%] cursor-pointer p-0 border-0"
+                  title="Choose custom color"
+                 />
+                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-white/20 group-hover:bg-transparent">
+                    <ICONS.Palette size={20} className="text-slate-600 mix-blend-multiply" />
+                 </div>
+               </div>
+             </div>
+           </div>
+        </div>
+      )}
+
+      {/* Upload Modal (Add New Word) */}
+      {showUploadModal && (
+        <div className="absolute inset-0 z-[60] bg-slate-900/80 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-slate-700 font-hand">Add New Word</h2>
+              <button onClick={() => setShowUploadModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                <ICONS.Close size={20} />
               </button>
             </div>
 
-            <button
-              onClick={handleCheckScore}
-              className="px-6 py-4 rounded-2xl bg-gradient-to-r from-crayon-yellow to-orange-400 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+            <div className="space-y-4">
+              {/* Method Toggles */}
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                <button 
+                  onClick={() => setImageInputMethod('upload')}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  Upload Photo
+                </button>
+                <button 
+                  onClick={() => setImageInputMethod('url')}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'url' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  Paste Link
+                </button>
+              </div>
+
+              {/* Image Input Area */}
+              <div className="h-48">
+                {imageInputMethod === 'upload' ? (
+                   <div 
+                    onClick={() => !isCompressing && fileInputRef.current?.click()}
+                    className={`h-full border-4 border-dashed border-slate-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-crayon-blue transition-colors relative overflow-hidden group ${isCompressing ? 'opacity-50 cursor-wait' : ''}`}
+                  >
+                    {isCompressing ? (
+                       <div className="flex flex-col items-center text-slate-400 gap-2">
+                          <span className="font-bold animate-pulse">Compressing...</span>
+                       </div>
+                    ) : newWordImage ? (
+                      <img src={newWordImage} alt="Preview" className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <div className="flex flex-col items-center text-slate-400 gap-2">
+                        <ICONS.Image size={48} />
+                        <span className="font-bold">Tap to add photo</span>
+                      </div>
+                    )}
+                    <input 
+                      ref={fileInputRef}
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload} 
+                      className="hidden" 
+                      disabled={isCompressing}
+                    />
+                    {newWordImage && !isCompressing && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-white font-bold">Change Photo</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col gap-2">
+                     <input 
+                        type="url" 
+                        placeholder="https://imgur.com/..."
+                        value={pastedUrl}
+                        onChange={(e) => setPastedUrl(e.target.value)}
+                        className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-crayon-blue outline-none font-sans text-sm text-slate-600"
+                      />
+                      <div className="flex-1 relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
+                         {pastedUrl ? (
+                           <img src={pastedUrl} alt="Preview" className="max-w-full max-h-full object-contain" onError={(e) => (e.currentTarget.style.opacity = '0.3')} />
+                         ) : (
+                           <span className="text-slate-300 text-sm font-bold">Preview will appear here</span>
+                         )}
+                      </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Word Input */}
+              <div>
+                <label className="block text-sm font-bold text-slate-500 uppercase mb-2">Word to Trace</label>
+                <input 
+                  type="text" 
+                  value={newWordText}
+                  onChange={(e) => setNewWordText(e.target.value)}
+                  placeholder="e.g. Daddy"
+                  className="w-full p-4 text-3xl font-hand text-center border-2 border-slate-200 rounded-xl focus:border-crayon-blue focus:outline-none"
+                  maxLength={10}
+                />
+              </div>
+
+              <button 
+                onClick={saveNewWord}
+                disabled={!newWordText || isCompressing || (imageInputMethod === 'url' && !pastedUrl) || (imageInputMethod === 'upload' && !newWordImage)}
+                className="w-full py-4 bg-crayon-blue text-white rounded-xl font-bold text-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 active:scale-95 transition-all"
+              >
+                Save Word
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Install Instruction Modal */}
+      {showInstallModal && (
+        <div className="absolute inset-0 z-[70] bg-slate-900/90 flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
+            <div className="flex justify-end">
+              <button onClick={() => setShowInstallModal(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                <ICONS.Close size={20} />
+              </button>
+            </div>
+            
+            <div className="flex justify-center mb-6">
+               <div className="p-4 bg-crayon-blue/10 rounded-full">
+                 <ICONS.Download size={48} className="text-crayon-blue" />
+               </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-2 font-hand">Install TinyTracer</h2>
+            <p className="text-slate-500 mb-8">Get the full screen experience for your child!</p>
+
+            <div className="space-y-6 text-left bg-slate-50 p-6 rounded-2xl">
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-white rounded-lg shadow-sm">
+                  <ICONS.ShareIOS size={24} className="text-crayon-blue" />
+                </div>
+                <span className="font-bold text-slate-600">1. Tap the <span className="text-black">Share</span> button</span>
+              </div>
+              <div className="h-px bg-slate-200 w-full" />
+              <div className="flex items-center gap-4">
+                 <div className="p-2 bg-white rounded-lg shadow-sm">
+                  <ICONS.Plus size={24} className="text-crayon-blue" />
+                 </div>
+                <span className="font-bold text-slate-600">2. Select <span className="text-black">Add to Home Screen</span></span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowInstallModal(false)}
+              className="mt-8 w-full py-3 bg-crayon-blue text-white rounded-xl font-bold text-lg shadow-lg hover:bg-blue-600"
             >
-              <ICONS.Trophy size={28} className="fill-white" />
-              <span className="font-bold text-lg">Check!</span>
+              Got it!
             </button>
           </div>
-
         </div>
-      </footer>
+      )}
 
     </div>
   );
