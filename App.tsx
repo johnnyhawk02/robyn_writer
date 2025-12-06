@@ -385,8 +385,8 @@ const App: React.FC = () => {
               )}
         </div>
 
-        {/* Layer 2: Tracing Text (Bottom Half with Increased Overlap) */}
-        <div className="relative z-10 w-full flex justify-center pb-[5vh] -mt-[15vh] pointer-events-none select-none">
+        {/* Layer 2: Tracing Text (Bottom Half) */}
+        <div className="relative z-10 w-full flex justify-center pb-[5vh] pointer-events-none select-none">
             <span 
               ref={textRef}
               className="text-[20vh] sm:text-[25vh] text-slate-400/50 tracking-widest leading-none text-center whitespace-nowrap drop-shadow-sm"
