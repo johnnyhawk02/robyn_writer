@@ -11,7 +11,6 @@ const App: React.FC = () => {
   // --- State ---
   const [words, setWords] = useState<TracingWord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  // Brush color is always black now
   const brushColor = BrushColor.Black;
   const [isEraserMode, setIsEraserMode] = useState(false);
   
@@ -19,13 +18,15 @@ const App: React.FC = () => {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [score, setScore] = useState(0);
 
-  // Upload Modal State (For users adding new words at runtime)
+  // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newWordText, setNewWordText] = useState('');
   const [newWordImage, setNewWordImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   // Image Loading State
   const [imgError, setImgError] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
 
   // PWA Install Prompt State
   const [showInstallModal, setShowInstallModal] = useState(false);
@@ -39,7 +40,6 @@ const App: React.FC = () => {
   // --- Initialization ---
   useEffect(() => {
     loadWords();
-    // Check for iOS Browser (eligible for PWA install instructions)
     const ua = window.navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isStandalone = 
@@ -50,7 +50,6 @@ const App: React.FC = () => {
   }, []);
 
   const loadWords = () => {
-    // 1. Load Custom Words (added by user at runtime)
     const savedCustom = localStorage.getItem(STORAGE_KEY);
     let customWords: TracingWord[] = [];
     if (savedCustom) {
@@ -60,17 +59,66 @@ const App: React.FC = () => {
         console.error("Failed to load custom words", e);
       }
     }
-
-    // 2. Combine with Initial Words (configured in constants.ts)
     setWords([...INITIAL_WORDS, ...customWords]);
   };
 
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
 
-  // Reset image error when word changes
+  // --- Robust Image Loading Logic ---
   useEffect(() => {
     setImgError(false);
-  }, [currentIndex]);
+    
+    if (currentWord.imageUrl) {
+      // 1. User Uploads (Base64 Data URLs)
+      if (currentWord.imageUrl.startsWith('data:')) {
+        setImageSrc(currentWord.imageUrl);
+      } 
+      // 2. External Hosting (Http/Https)
+      else if (currentWord.imageUrl.startsWith('http')) {
+        let url = currentWord.imageUrl;
+        // Github Blob fix
+        if (url.includes('github.com') && url.includes('/blob/')) {
+           url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+        }
+        setImageSrc(url);
+      }
+      // 3. Local Assets (Hosted in Repo)
+      else {
+        // If the user provided a full relative path (e.g. "assets/bed.png"), use it.
+        // If they just provided a filename (e.g. "bed.png"), assume it's in the default ./assets/ folder.
+        const isPath = currentWord.imageUrl.includes('/');
+        const finalPath = isPath ? currentWord.imageUrl : `./assets/${currentWord.imageUrl}`;
+        setImageSrc(finalPath);
+      }
+    } else {
+      setImageSrc(null);
+    }
+  }, [currentWord, currentIndex]);
+
+  const handleImageError = () => {
+    if (!imageSrc) return;
+
+    // If it was an external URL that failed, we can't recover locally
+    if (imageSrc.startsWith('http')) {
+        console.warn(`Failed to load external image: ${imageSrc}`);
+        setImgError(true);
+        return;
+    }
+
+    // Fallback logic for local assets
+    // If we tried './assets/dog.png' and it failed, maybe the user put it in root 'dog.png'?
+    if (imageSrc.includes('assets/')) {
+      console.log(`Failed to load from assets folder: ${imageSrc}. Retrying from root...`);
+      const filename = imageSrc.split('/').pop();
+      if (filename) {
+        setImageSrc(`./${filename}`); 
+        return;
+      }
+    }
+
+    console.warn(`Could not load image for: ${currentWord.text}`);
+    setImgError(true);
+  };
 
   // --- Handlers: Canvas ---
   const handleClear = () => {
@@ -103,15 +151,62 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Handlers: Upload (New Word) ---
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- Handlers: Upload with Compression ---
+  
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // STRICTER LIMITS FOR 10MB APP LIMIT
+          const MAX_SIZE = 512; 
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Lower quality (0.5) to ensure we respect storage limits
+          resolve(canvas.toDataURL('image/jpeg', 0.5)); 
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewWordImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setIsCompressing(true);
+      try {
+        const compressedBase64 = await compressImage(file);
+        setNewWordImage(compressedBase64);
+      } catch (error) {
+        console.error("Image compression failed", error);
+        alert("Sorry, there was an issue processing that image.");
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -130,25 +225,25 @@ const App: React.FC = () => {
     const existingCustom = savedCustom ? JSON.parse(savedCustom) : [];
     const updatedCustom = [...existingCustom, newWord];
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustom));
-    loadWords(); // Reload to refresh state
-
-    // Reset and close
-    setNewWordText('');
-    setNewWordImage(null);
-    setShowUploadModal(false);
-    
-    // Jump to new word (it will be at end of list)
-    const newTotalLength = INITIAL_WORDS.length + updatedCustom.length;
-    handleClear();
-    setCurrentIndex(newTotalLength - 1);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustom));
+      loadWords();
+      setNewWordText('');
+      setNewWordImage(null);
+      setShowUploadModal(false);
+      
+      const newTotalLength = INITIAL_WORDS.length + updatedCustom.length;
+      handleClear();
+      setCurrentIndex(newTotalLength - 1);
+    } catch (e) {
+      alert("Storage full! Please delete some custom words or try a smaller image.");
+    }
   };
 
   // --- Styles ---
   const activeColor = brushColor;
   const activeLineWidth = isEraserMode ? 40 : 16; 
 
-  // Helpers
   const getStars = (s: number) => {
     if (s >= 90) return '⭐⭐⭐';
     if (s >= 70) return '⭐⭐';
@@ -226,17 +321,21 @@ const App: React.FC = () => {
           
           {/* Visual Cue */}
           <div className="flex-none h-[25%] flex items-center justify-center w-full px-8 relative pointer-events-auto">
-             {currentWord.imageUrl && !imgError ? (
+             {currentWord.imageUrl && !imgError && imageSrc ? (
                 <img 
-                  src={currentWord.imageUrl} 
-                  onError={() => setImgError(true)}
+                  key={imageSrc} // Forces React to remount image on source change
+                  src={imageSrc} 
+                  onError={handleImageError}
                   alt={currentWord.text} 
-                  className="h-[25vh] w-auto object-contain rounded-xl shadow-lg border-4 border-white transform rotate-2 animate-in zoom-in-95 duration-500"
+                  className="h-[25vh] w-auto object-contain rounded-xl shadow-lg border-4 border-white transform rotate-2 animate-in zoom-in-95 duration-500 bg-white"
                 />
               ) : (
-                <span className="text-[12vh] leading-none filter drop-shadow-xl transform hover:scale-110 transition-transform block">
-                  {currentWord.emoji || '📝'}
-                </span>
+                /* Beautiful Fallback: Emoji Sticker */
+                <div className="flex items-center justify-center h-[25vh] w-[25vh] bg-white rounded-full shadow-lg border-4 border-slate-100 animate-in zoom-in-95 duration-500">
+                  <span className="text-[12vh] leading-none filter drop-shadow-sm transform hover:scale-110 transition-transform cursor-default select-none">
+                    {currentWord.emoji || '🎨'}
+                  </span>
+                </div>
               )}
           </div>
 
@@ -292,11 +391,15 @@ const App: React.FC = () => {
               <div className="space-y-6">
                 {/* Image Picker */}
                 <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-4 border-dashed border-slate-200 rounded-2xl h-48 flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-crayon-blue transition-colors relative overflow-hidden group"
+                  onClick={() => !isCompressing && fileInputRef.current?.click()}
+                  className={`border-4 border-dashed border-slate-200 rounded-2xl h-48 flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-crayon-blue transition-colors relative overflow-hidden group ${isCompressing ? 'opacity-50 cursor-wait' : ''}`}
                 >
-                  {newWordImage ? (
-                    <img src={newWordImage} alt="Preview" className="w-full h-full object-cover" />
+                  {isCompressing ? (
+                     <div className="flex flex-col items-center text-slate-400 gap-2">
+                        <span className="font-bold animate-pulse">Compressing...</span>
+                     </div>
+                  ) : newWordImage ? (
+                    <img src={newWordImage} alt="Preview" className="w-full h-full object-contain p-2" />
                   ) : (
                     <div className="flex flex-col items-center text-slate-400 gap-2">
                       <ICONS.Image size={48} />
@@ -309,8 +412,9 @@ const App: React.FC = () => {
                     accept="image/*" 
                     onChange={handleImageUpload} 
                     className="hidden" 
+                    disabled={isCompressing}
                   />
-                  {newWordImage && (
+                  {newWordImage && !isCompressing && (
                     <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-white font-bold">Change Photo</span>
                     </div>
@@ -332,7 +436,7 @@ const App: React.FC = () => {
 
                 <button 
                   onClick={saveNewWord}
-                  disabled={!newWordText}
+                  disabled={!newWordText || isCompressing}
                   className="w-full py-4 bg-crayon-blue text-white rounded-xl font-bold text-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 active:scale-95 transition-all"
                 >
                   Save Word

@@ -4,12 +4,26 @@ import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as I
 
 /* 
  * ==========================================
- * HOW TO ADD YOUR OWN PHOTOS
+ * WHERE DO I PUT MY IMAGES?
  * ==========================================
  * 
- * 1. Create a folder named 'assets' next to index.html
- * 2. Put your photos in there (e.g. bed.png)
- * 3. Make sure the filenames match the ones below exactly!
+ * Your project folder should look like this:
+ * 
+ * my-app/
+ * ├── public/             <-- 1. Create this folder at the top
+ * │   └── assets/         <-- 2. Create this inside 'public'
+ * │       ├── bed.png     <-- 3. Put your images here
+ * │       └── cat.png
+ * ├── index.html
+ * └── package.json
+ *
+ * HOW TO USE THEM IN CODE:
+ * 1. Just use the filename: imageUrl: 'bed.png'
+ *    (The app automatically looks in the assets folder)
+ * 
+ * OPTION 2: External Links (No folders needed)
+ * 1. Upload to Imgur.com or GitHub.
+ * 2. Use the link: imageUrl: 'https://imgur.com/example.png'
  */
 
 export const INITIAL_WORDS: TracingWord[] = [
@@ -17,61 +31,61 @@ export const INITIAL_WORDS: TracingWord[] = [
     text: 'bed', 
     category: 'Home', 
     emoji: '🛏️', 
-    imageUrl: './assets/bed.png' 
+    imageUrl: 'bed.png' 
   },
   { 
     text: 'cat', 
     category: 'Animals', 
     emoji: '🐱', 
-    imageUrl: './assets/cat.png' 
+    imageUrl: 'cat.png' 
   },
   { 
     text: 'ball', 
     category: 'Toys', 
     emoji: '⚽', 
-    imageUrl: './assets/ball.png' 
+    imageUrl: 'ball.png' 
   },
   { 
     text: 'doll', 
     category: 'Toys', 
     emoji: '🧸', 
-    imageUrl: './assets/doll.png' 
+    imageUrl: 'doll.png' 
   },
   { 
     text: 'dog', 
     category: 'Animals', 
     emoji: '🐶', 
-    imageUrl: './assets/dog.png' 
+    imageUrl: 'dog.png' 
   },
   { 
     text: 'bear', 
     category: 'Animals', 
     emoji: '🐻', 
-    imageUrl: './assets/bear.png' 
+    imageUrl: 'bear.png' 
   },
   { 
     text: 'chair', 
     category: 'Home', 
     emoji: '🪑', 
-    imageUrl: './assets/chair.png' 
+    imageUrl: 'chair.png' 
   },
   { 
     text: 'sitting', 
     category: 'Actions', 
     emoji: '🧘', 
-    imageUrl: './assets/sitting.png' 
+    imageUrl: 'sitting.png' 
   },
   { 
     text: 'on', 
     category: 'Position', 
     emoji: '🔛', 
-    imageUrl: './assets/on.png' 
+    imageUrl: 'on.png' 
   },
   { 
     text: 'socks', 
     category: 'Clothes', 
     emoji: '🧦', 
-    imageUrl: './assets/socks.png' 
+    imageUrl: 'socks.png' 
   },
 ];
 
