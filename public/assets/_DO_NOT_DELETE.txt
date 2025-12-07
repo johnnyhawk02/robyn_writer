@@ -1,3 +1,0 @@
-
-This file exists to ensure the public/assets folder is tracked by Git and not deleted by deployment tools.
-Please upload your images (bed.png, cat.png, etc.) into this folder.

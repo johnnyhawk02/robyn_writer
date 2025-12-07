@@ -30,7 +30,7 @@ export const INITIAL_WORDS: TracingWord[] = [
     text: 'ball', 
     category: 'Toys', 
     emoji: '⚽', 
-    imageUrl: 'ball.png' // Waiting for link
+    imageUrl: 'https://i.postimg.cc/cHsj19L8/ball.png' 
   },
   { 
     text: 'doll', 
@@ -72,7 +72,7 @@ export const INITIAL_WORDS: TracingWord[] = [
     text: 'socks', 
     category: 'Clothes', 
     emoji: '🧦', 
-    imageUrl: 'socks.png' // Waiting for link
+    imageUrl: 'https://i.postimg.cc/3NrH6rGN/socks.png' 
   },
 ];
 
