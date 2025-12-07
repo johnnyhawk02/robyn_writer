@@ -23,6 +23,16 @@ const PRESET_COLORS = [
   '#FBCFE8', // Pink 200
 ];
 
+interface Balloon {
+  id: number;
+  x: number;
+  color: string;
+  speed: number;
+  delay: number;
+  scale: number;
+  rotation: number;
+}
+
 const App: React.FC = () => {
   // --- State ---
   const [words, setWords] = useState<TracingWord[]>([]);
@@ -36,6 +46,7 @@ const App: React.FC = () => {
 
   // Celebration State
   const [showCelebration, setShowCelebration] = useState(false);
+  const [balloons, setBalloons] = useState<Balloon[]>([]);
   
   // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -134,8 +145,32 @@ const App: React.FC = () => {
     timerRef.current = null;
     visitedZones.current.clear();
     setShowCelebration(false);
+    setBalloons([]);
     letterRefs.current = []; // Reset refs
   }, [currentIndex]);
+
+  // Spawn Balloons on Celebration
+  useEffect(() => {
+    if (showCelebration) {
+      const colors = ['#EF4444', '#3B82F6', '#22C55E', '#EAB308', '#A855F7', '#EC4899'];
+      const newBalloons: Balloon[] = Array.from({ length: 15 }).map((_, i) => ({
+        id: Date.now() + i,
+        x: Math.random() * 80 + 10, // 10% to 90%
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: Math.random() * 4 + 5, // 5-9 seconds
+        delay: Math.random() * 2,
+        scale: Math.random() * 0.4 + 0.8,
+        rotation: Math.random() * 20 - 10,
+      }));
+      setBalloons(newBalloons);
+    }
+  }, [showCelebration]);
+
+  const popBalloon = (id: number) => {
+    setBalloons(prev => prev.filter(b => b.id !== id));
+    // Optional: Add haptic feedback if supported
+    if (navigator.vibrate) navigator.vibrate(50);
+  };
 
   // --- Robust Image Loading Logic ---
   useEffect(() => {
@@ -229,7 +264,7 @@ const App: React.FC = () => {
       if (!timerRef.current) {
         timerRef.current = setTimeout(() => {
           setShowCelebration(true);
-        }, 4000); // 4 seconds delay
+        }, 1000); // 1 second delay before party
       }
     }
   }, [currentWord.text.length, isEraserMode, showCelebration]);
@@ -324,6 +359,10 @@ const App: React.FC = () => {
   
   // New larger button class for Prev/Next
   const navBtnClass = "p-8 rounded-full bg-white/60 hover:bg-white/90 shadow-xl backdrop-blur-md active:scale-95 transition-all text-slate-600 border-2 border-white/50";
+  // Highlight next button when celebration is active
+  const nextBtnClass = showCelebration 
+    ? `${navBtnClass} ring-4 ring-crayon-green/50 scale-110 bg-green-50 animate-pulse` 
+    : navBtnClass;
 
   if (!currentWord) return null;
 
@@ -332,6 +371,13 @@ const App: React.FC = () => {
       className="relative h-full w-full select-none overflow-hidden touch-none transition-colors duration-500"
       style={{ backgroundColor: bgColor }}
     >
+      <style>{`
+        @keyframes floatUp {
+          0% { transform: translateY(100vh) scale(var(--scale)) rotate(var(--rot)); opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateY(-120vh) scale(var(--scale)) rotate(var(--rot)); opacity: 0; }
+        }
+      `}</style>
       
       {/* --- Floating UI Controls Layer --- */}
       <div className="absolute inset-0 z-50 pointer-events-none p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col justify-between">
@@ -396,7 +442,7 @@ const App: React.FC = () => {
               </div>
           </div>
 
-          {/* Navigation Arrows (Vertically Centered) - SIZE INCREASED */}
+          {/* Navigation Arrows (Vertically Centered) */}
           <div className="absolute top-1/2 left-6 -translate-y-1/2 pointer-events-auto">
              <button 
                 onClick={handlePrev}
@@ -410,7 +456,7 @@ const App: React.FC = () => {
           <div className="absolute top-1/2 right-6 -translate-y-1/2 pointer-events-auto">
              <button 
                 onClick={handleNext}
-                className={navBtnClass}
+                className={nextBtnClass}
                 aria-label="Next Word"
               >
                 <ICONS.Next size={64} />
@@ -442,7 +488,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Bottom Half: Text (Split into Spans for Hit Testing) */}
-        <div className="flex-1 w-full flex items-start justify-center pt-2 sm:pt-4">
+        <div className="flex-1 w-full flex items-start justify-center pt-8 sm:pt-12">
             <div 
               className="tracking-widest leading-none text-center whitespace-nowrap select-none pointer-events-none flex items-center justify-center"
               style={{ fontFamily: '"Andika", sans-serif' }}
@@ -451,7 +497,7 @@ const App: React.FC = () => {
                 <span
                   key={index}
                   ref={(el) => { letterRefs.current[index] = el; }}
-                  className="inline-block text-[20vh] sm:text-[25vh] text-black/15 mix-blend-multiply"
+                  className="inline-block text-[30vh] sm:text-[38vh] text-black/15 mix-blend-multiply"
                 >
                   {char}
                 </span>
@@ -471,35 +517,74 @@ const App: React.FC = () => {
            onStrokeEnd={handleStrokeEnd}
       />
       
-      {/* Celebration Modal */}
+      {/* Celebration Layer (Balloons & Confetti) - No blocking Modal */}
       {showCelebration && (
-        <div className="absolute inset-0 z-[100] bg-black/40 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[3rem] p-10 shadow-2xl flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500 max-w-sm w-full">
-            <div className="text-8xl animate-bounce mb-2">🎉</div>
-            <h2 className="text-4xl font-black text-crayon-blue font-hand text-center">Great Job!</h2>
-            <div className="text-slate-400 text-xl font-bold font-hand text-center">You traced {currentWord.text}!</div>
-            
-            <button 
-              onClick={handleNext}
-              className="mt-4 w-full py-4 bg-gradient-to-r from-crayon-blue to-blue-400 text-white rounded-2xl font-bold text-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
-            >
-              Next Word
-            </button>
+        <div className="absolute inset-0 z-[80] pointer-events-none overflow-hidden">
+          
+          {/* Confetti (CSS Particles) */}
+          {[...Array(30)].map((_, i) => (
+             <div key={`confetti-${i}`} className="absolute animate-[spin_3s_linear_infinite]" 
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `-10%`,
+                    animation: `fall ${Math.random() * 3 + 2}s linear forwards`,
+                    animationDelay: `${Math.random() * 2}s`,
+                    opacity: 0.8,
+                    fontSize: `${Math.random() * 20 + 20}px`
+                  }}>
+                 {['⭐', '🎈', '✨', '🎨', '🎉'][i % 5]}
+             </div>
+           ))}
+
+          {/* Poppable Balloons */}
+          {balloons.map((b) => (
+             <div
+               key={b.id}
+               onClick={() => popBalloon(b.id)}
+               className="absolute bottom-[-20%] pointer-events-auto cursor-pointer"
+               style={{
+                 left: `${b.x}%`,
+                 width: '100px',
+                 height: '120px',
+                 animation: `floatUp ${b.speed}s linear ${b.delay}s forwards`,
+                 '--scale': b.scale,
+                 '--rot': `${b.rotation}deg`,
+               } as React.CSSProperties}
+             >
+                {/* CSS Balloon Shape */}
+                <div 
+                   className="w-[80px] h-[95px] rounded-[50%_50%_50%_50%_/_40%_40%_60%_60%] shadow-inner transition-transform active:scale-150 active:opacity-0"
+                   style={{ 
+                      backgroundColor: b.color,
+                      boxShadow: 'inset -10px -10px 20px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2)'
+                   }}
+                >
+                   {/* Shine */}
+                   <div className="absolute top-[15%] left-[20%] w-[15px] h-[25px] bg-white/30 rounded-[50%] rotate-[-30deg]" />
+                </div>
+                {/* Knot */}
+                <div 
+                   className="absolute bottom-[24px] left-[40px] -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[10px] border-l-transparent border-r-transparent"
+                   style={{ borderBottomColor: b.color }}
+                />
+                {/* String */}
+                <div className="absolute bottom-0 left-[40px] -translate-x-1/2 w-[1px] h-[25px] bg-slate-400/50" />
+             </div>
+          ))}
+
+          {/* Floating Text (Non-blocking) */}
+          <div className="absolute top-[15%] left-0 w-full text-center pointer-events-none animate-[bounce_2s_infinite]">
+             <span className="text-6xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 drop-shadow-lg" style={{ WebkitTextStroke: '2px white' }}>
+               Great Job!
+             </span>
           </div>
-          {/* Confetti Effect (CSS only simplified) */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-             {[...Array(20)].map((_, i) => (
-               <div key={i} className="absolute animate-[spin_3s_linear_infinite]" 
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                      top: `${Math.random() * 100}%`,
-                      animationDelay: `${Math.random() * 2}s`,
-                      opacity: 0.6
-                    }}>
-                   {['⭐', '🎈', '✨', '🎨'][i % 4]}
-               </div>
-             ))}
-          </div>
+
+          <style>{`
+             @keyframes fall {
+               0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+               100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+             }
+          `}</style>
         </div>
       )}
 
