@@ -369,13 +369,27 @@ const App: React.FC = () => {
   return (
     <div 
       className="relative h-full w-full select-none overflow-hidden touch-none transition-colors duration-500"
-      style={{ backgroundColor: bgColor }}
+      style={{ 
+        backgroundColor: showCelebration ? undefined : bgColor,
+        animation: showCelebration ? 'partyCycle 3s linear infinite' : 'none'
+      }}
     >
       <style>{`
         @keyframes floatUp {
           0% { transform: translateY(100vh) scale(var(--scale)) rotate(var(--rot)); opacity: 1; }
           80% { opacity: 1; }
           100% { transform: translateY(-120vh) scale(var(--scale)) rotate(var(--rot)); opacity: 0; }
+        }
+        @keyframes fall {
+          0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+        }
+        @keyframes partyCycle {
+          0% { background-color: #FECACA; }
+          25% { background-color: #BBF7D0; }
+          50% { background-color: #BFDBFE; }
+          75% { background-color: #F5D0FE; }
+          100% { background-color: #FECACA; }
         }
       `}</style>
       
@@ -488,7 +502,8 @@ const App: React.FC = () => {
         </div>
 
         {/* Bottom Half: Text (Split into Spans for Hit Testing) */}
-        <div className="flex-1 w-full flex items-start justify-center pt-8 sm:pt-12">
+        {/* Reduced top padding (pt-2 sm:pt-4) to raise text up for tails support */}
+        <div className="flex-1 w-full flex items-start justify-center pt-2 sm:pt-4 pb-10">
             <div 
               className="tracking-widest leading-none text-center whitespace-nowrap select-none pointer-events-none flex items-center justify-center"
               style={{ fontFamily: '"Andika", sans-serif' }}
@@ -572,19 +587,6 @@ const App: React.FC = () => {
              </div>
           ))}
 
-          {/* Floating Text (Non-blocking) */}
-          <div className="absolute top-[15%] left-0 w-full text-center pointer-events-none animate-[bounce_2s_infinite]">
-             <span className="text-6xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 drop-shadow-lg" style={{ WebkitTextStroke: '2px white' }}>
-               Great Job!
-             </span>
-          </div>
-
-          <style>{`
-             @keyframes fall {
-               0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-               100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-             }
-          `}</style>
         </div>
       )}
 
