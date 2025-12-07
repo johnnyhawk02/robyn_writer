@@ -122,6 +122,10 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSetImageInputMethod = (method: 'upload' | 'url') => {
+    setImageInputMethod(method);
+  }
+
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
 
   // Reset state on word change
@@ -419,14 +423,14 @@ const App: React.FC = () => {
       <main className="absolute inset-0 w-full h-full flex flex-col items-center justify-center z-0">
         
         {/* Top Half: Image */}
-        <div className="flex-1 w-full flex items-end justify-center pb-4 sm:pb-8 px-12">
+        <div className="flex-1 w-full flex items-end justify-center pb-4 sm:pb-8 px-2">
              {currentWord.imageUrl && !imgError && imageSrc ? (
                 <img 
                   key={imageSrc} 
                   src={imageSrc} 
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  className="max-h-[40vh] w-auto max-w-full object-contain animate-in zoom-in-95 duration-700 drop-shadow-sm select-none pointer-events-none" 
+                  className="h-[38vh] sm:h-[45vh] w-auto max-w-[95vw] object-contain animate-in zoom-in-95 duration-700 drop-shadow-md select-none pointer-events-none" 
                 />
               ) : (
                 <div className="flex items-center justify-center opacity-30">
@@ -554,13 +558,13 @@ const App: React.FC = () => {
               {/* Method Toggles */}
               <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                 <button 
-                  onClick={() => setImageInputMethod('upload')}
+                  onClick={() => handleSetImageInputMethod('upload')}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'upload' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   Upload Photo
                 </button>
                 <button 
-                  onClick={() => setImageInputMethod('url')}
+                  onClick={() => handleSetImageInputMethod('url')}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${imageInputMethod === 'url' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   Paste Link
@@ -604,7 +608,7 @@ const App: React.FC = () => {
                   <div className="h-full flex flex-col gap-2">
                      <input 
                         type="url" 
-                        placeholder="https://imgur.com/..."
+                        placeholder="https://postimg.cc/..."
                         value={pastedUrl}
                         onChange={(e) => setPastedUrl(e.target.value)}
                         className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-crayon-blue outline-none font-sans text-sm text-slate-600"

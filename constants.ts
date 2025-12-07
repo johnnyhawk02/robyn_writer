@@ -7,17 +7,10 @@ import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as I
  * IMAGE SETUP
  * ==========================================
  * 
- * You have two options for images:
+ * We are now using hosted images from PostImages.cc!
+ * This prevents the "missing folder" issue on GitHub.
  * 
- * OPTION 1: Manual GitHub Upload (Recommended for you)
- * 1. Go to your repo on GitHub.
- * 2. Open the 'public/assets' folder.
- * 3. Upload your images (e.g. 'bed.png').
- * 4. Use the filename below (imageUrl: 'bed.png').
- * 
- * OPTION 2: External Links
- * You can also paste full URLs from Imgur/PostImages.
- * (imageUrl: 'https://i.imgur.com/example.png')
+ * These are the high-resolution direct links.
  */
 
 export const INITIAL_WORDS: TracingWord[] = [
@@ -25,61 +18,61 @@ export const INITIAL_WORDS: TracingWord[] = [
     text: 'bed', 
     category: 'Home', 
     emoji: '🛏️', 
-    imageUrl: 'bed.png' 
+    imageUrl: 'https://i.postimg.cc/vTFG4mr2/bed.png' 
   },
   { 
     text: 'cat', 
     category: 'Animals', 
     emoji: '🐱', 
-    imageUrl: 'cat.png' 
+    imageUrl: 'https://i.postimg.cc/NFqQK064/cat.png' 
   },
   { 
     text: 'ball', 
     category: 'Toys', 
     emoji: '⚽', 
-    imageUrl: 'ball.png' 
+    imageUrl: 'ball.png' // Waiting for link
   },
   { 
     text: 'doll', 
     category: 'Toys', 
     emoji: '🧸', 
-    imageUrl: 'doll.png' 
+    imageUrl: 'https://i.postimg.cc/fynMVbc5/doll.png' 
   },
   { 
     text: 'dog', 
     category: 'Animals', 
     emoji: '🐶', 
-    imageUrl: 'dog.png' 
+    imageUrl: 'https://i.postimg.cc/cCydvJRr/dog.png' 
   },
   { 
     text: 'bear', 
     category: 'Animals', 
     emoji: '🐻', 
-    imageUrl: 'bear.png' 
+    imageUrl: 'https://i.postimg.cc/wM891BXt/bear.png' 
   },
   { 
     text: 'chair', 
     category: 'Home', 
     emoji: '🪑', 
-    imageUrl: 'chair.png' 
+    imageUrl: 'https://i.postimg.cc/ZntJWq80/chair.png' 
   },
   { 
     text: 'sitting', 
     category: 'Actions', 
     emoji: '🧘', 
-    imageUrl: 'sitting.png' 
+    imageUrl: 'https://i.postimg.cc/rsXqDp1D/sitting.png' 
   },
   { 
     text: 'on', 
     category: 'Position', 
     emoji: '🔛', 
-    imageUrl: 'on.png' 
+    imageUrl: 'https://i.postimg.cc/63G96ZvX/on.png' 
   },
   { 
     text: 'socks', 
     category: 'Clothes', 
     emoji: '🧦', 
-    imageUrl: 'socks.png' 
+    imageUrl: 'socks.png' // Waiting for link
   },
 ];
 
