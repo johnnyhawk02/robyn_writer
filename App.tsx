@@ -1,9 +1,8 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import TraceCanvas, { TraceCanvasHandle } from './components/TraceCanvas';
 import { INITIAL_WORDS, ICONS } from './constants';
 import { TracingWord, BrushColor } from './types';
-// import { calculateScore } from './services/scoringService'; // Score feature removed from UI
 import { Link } from 'lucide-react';
 
 const STORAGE_KEY = 'tinytracer_custom_words';
@@ -35,6 +34,9 @@ const App: React.FC = () => {
   const [bgColor, setBgColor] = useState(PRESET_COLORS[1]);
   const [showBgPicker, setShowBgPicker] = useState(false);
 
+  // Celebration State
+  const [showCelebration, setShowCelebration] = useState(false);
+  
   // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newWordText, setNewWordText] = useState('');
@@ -55,8 +57,13 @@ const App: React.FC = () => {
 
   // Refs
   const canvasRef = useRef<TraceCanvasHandle>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Hit Testing Refs
+  const letterRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const letterRects = useRef<DOMRect[]>([]);
+  const visitedZones = useRef<Set<number>>(new Set());
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Initialization ---
   useEffect(() => {
@@ -70,6 +77,22 @@ const App: React.FC = () => {
     
     setIsIOSBrowser(isIOS && !isStandalone);
   }, []);
+
+  // Update rects when word changes or resize
+  useEffect(() => {
+    const updateRects = () => {
+      // Small delay to allow layout to settle (e.g. image loading)
+      setTimeout(() => {
+        letterRects.current = letterRefs.current
+          .filter(el => el !== null)
+          .map(el => el!.getBoundingClientRect());
+      }, 300);
+    };
+
+    updateRects();
+    window.addEventListener('resize', updateRects);
+    return () => window.removeEventListener('resize', updateRects);
+  }, [currentIndex, imageSrc]); // Update when imageSrc changes as it might shift text layout
 
   const loadWords = () => {
     const savedCustom = localStorage.getItem(STORAGE_KEY);
@@ -94,7 +117,6 @@ const App: React.FC = () => {
   const handleSetBgColor = (color: string) => {
     setBgColor(color);
     localStorage.setItem(BG_STORAGE_KEY, color);
-    // Don't close modal immediately for custom color picker
     if (PRESET_COLORS.includes(color)) {
       setShowBgPicker(false);
     }
@@ -102,30 +124,34 @@ const App: React.FC = () => {
 
   const currentWord = words[currentIndex] || INITIAL_WORDS[0];
 
+  // Reset state on word change
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    visitedZones.current.clear();
+    setShowCelebration(false);
+    letterRefs.current = []; // Reset refs
+  }, [currentIndex]);
+
   // --- Robust Image Loading Logic ---
   useEffect(() => {
     setImgError(false);
     
     if (currentWord.imageUrl) {
-      // 1. User Uploads (Base64 Data URLs)
       if (currentWord.imageUrl.startsWith('data:')) {
         setImageSrc(currentWord.imageUrl);
       } 
-      // 2. External Hosting (Http/Https)
       else if (currentWord.imageUrl.startsWith('http')) {
         let url = currentWord.imageUrl;
-        // Github Blob fix
         if (url.includes('github.com') && url.includes('/blob/')) {
            url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
         }
         setImageSrc(url);
       }
-      // 3. Local Assets (Hosted in Repo)
       else {
-        // If the user provided a full relative path (e.g. "assets/bed.png"), use it.
-        // If they just provided a filename (e.g. "bed.png"), assume it's in the default ./assets/ folder.
-        const isPath = currentWord.imageUrl.includes('/');
-        const finalPath = isPath ? currentWord.imageUrl : `./assets/${currentWord.imageUrl}`;
+        // Handle local assets - prioritize absolute path /assets/
+        const filename = currentWord.imageUrl.split('/').pop();
+        const finalPath = `/assets/${filename}`;
         setImageSrc(finalPath);
       }
     } else {
@@ -135,32 +161,25 @@ const App: React.FC = () => {
 
   const handleImageError = () => {
     if (!imageSrc) return;
-
-    // If it was an external URL that failed, we can't recover locally
-    if (imageSrc.startsWith('http')) {
-        console.warn(`Failed to load external image: ${imageSrc}`);
-        setImgError(true);
-        return;
+    
+    // Fallback logic: if /assets/ fails, try ./assets/ as a backup, otherwise fail
+    if (imageSrc.startsWith('/assets/')) {
+       const relativePath = `.${imageSrc}`;
+       // If we haven't tried relative yet, try it
+       setImageSrc(relativePath);
+       return;
     }
 
-    // Fallback logic for local assets
-    // If we tried './assets/dog.png' and it failed, maybe the user put it in root 'dog.png'?
-    if (imageSrc.includes('assets/')) {
-      console.log(`Failed to load from assets folder: ${imageSrc}. Retrying from root...`);
-      const filename = imageSrc.split('/').pop();
-      if (filename) {
-        setImageSrc(`./${filename}`); 
-        return;
-      }
-    }
-
-    console.warn(`Could not load image for: ${currentWord.text}`);
+    // If we are already on http or relative failed, show error
     setImgError(true);
   };
 
   // --- Handlers: Canvas ---
   const handleClear = () => {
     canvasRef.current?.clearCanvas();
+    visitedZones.current.clear();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
   };
 
   const handleNext = () => {
@@ -177,8 +196,41 @@ const App: React.FC = () => {
     setIsEraserMode(!isEraserMode);
   };
 
+  // --- Drawing & Hit Detection ---
+  const handleDraw = useCallback((x: number, y: number) => {
+    // If we are erasing or already won, don't check
+    if (isEraserMode || showCelebration || timerRef.current) return;
+
+    const rects = letterRects.current;
+    const padding = 20; // Forgive sloppy tracing by expanding hit area
+
+    rects.forEach((rect, index) => {
+      if (
+        x >= rect.left - padding &&
+        x <= rect.right + padding &&
+        y >= rect.top - padding &&
+        y <= rect.bottom + padding
+      ) {
+        visitedZones.current.add(index);
+      }
+    });
+  }, [isEraserMode, showCelebration]);
+
+  const handleStrokeEnd = useCallback(() => {
+    // Check win condition ONLY when stylus lifts up
+    if (isEraserMode || showCelebration || timerRef.current) return;
+
+    if (visitedZones.current.size === currentWord.text.length) {
+      // All letters touched! Start timer.
+      if (!timerRef.current) {
+        timerRef.current = setTimeout(() => {
+          setShowCelebration(true);
+        }, 4000); // 4 seconds delay
+      }
+    }
+  }, [currentWord.text.length, isEraserMode, showCelebration]);
+
   // --- Handlers: Upload with Compression ---
-  
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -190,10 +242,7 @@ const App: React.FC = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          
-          // INCREASED SIZE FOR CRISPER IMAGES
           const MAX_SIZE = 1024; 
-
           if (width > height) {
             if (width > MAX_SIZE) {
               height *= MAX_SIZE / width;
@@ -205,12 +254,10 @@ const App: React.FC = () => {
               height = MAX_SIZE;
             }
           }
-
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          
           resolve(canvas.toDataURL('image/jpeg', 0.6)); 
         };
         img.onerror = (err) => reject(err);
@@ -227,7 +274,6 @@ const App: React.FC = () => {
         const compressedBase64 = await compressImage(file);
         setNewWordImage(compressedBase64);
       } catch (error) {
-        console.error("Image compression failed", error);
         alert("Sorry, there was an issue processing that image.");
       } finally {
         setIsCompressing(false);
@@ -237,9 +283,7 @@ const App: React.FC = () => {
 
   const saveNewWord = () => {
     if (!newWordText.trim()) return;
-
     const finalImage = imageInputMethod === 'upload' ? newWordImage : pastedUrl;
-
     const newWord: TracingWord = {
       id: Date.now().toString(),
       text: newWordText.toLowerCase(),
@@ -271,9 +315,11 @@ const App: React.FC = () => {
   // --- Styles ---
   const activeColor = brushColor;
   const activeLineWidth = isEraserMode ? 40 : 16; 
-
   const floatBtnClass = "p-3 rounded-full bg-white/80 shadow-lg backdrop-blur-sm hover:bg-white active:scale-95 transition-all z-50 flex items-center justify-center";
   const activeEraserClass = "bg-slate-800 text-white shadow-xl scale-110 ring-2 ring-white";
+  
+  // New larger button class for Prev/Next
+  const navBtnClass = "p-8 rounded-full bg-white/60 hover:bg-white/90 shadow-xl backdrop-blur-md active:scale-95 transition-all text-slate-600 border-2 border-white/50";
 
   if (!currentWord) return null;
 
@@ -284,7 +330,6 @@ const App: React.FC = () => {
     >
       
       {/* --- Floating UI Controls Layer --- */}
-      {/* pointer-events-none ensures touches pass through to canvas where there are no buttons */}
       <div className="absolute inset-0 z-50 pointer-events-none p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col justify-between">
           
           {/* Top Row */}
@@ -347,24 +392,24 @@ const App: React.FC = () => {
               </div>
           </div>
 
-          {/* Navigation Arrows (Vertically Centered) */}
-          <div className="absolute top-1/2 left-4 -translate-y-1/2 pointer-events-auto">
+          {/* Navigation Arrows (Vertically Centered) - SIZE INCREASED */}
+          <div className="absolute top-1/2 left-6 -translate-y-1/2 pointer-events-auto">
              <button 
                 onClick={handlePrev}
-                className="p-4 rounded-full bg-white/60 hover:bg-white/90 shadow-lg backdrop-blur-sm active:scale-95 transition-all text-slate-600"
+                className={navBtnClass}
                 aria-label="Previous Word"
               >
-                <ICONS.Prev size={32} />
+                <ICONS.Prev size={64} />
               </button>
           </div>
           
-          <div className="absolute top-1/2 right-4 -translate-y-1/2 pointer-events-auto">
+          <div className="absolute top-1/2 right-6 -translate-y-1/2 pointer-events-auto">
              <button 
                 onClick={handleNext}
-                className="p-4 rounded-full bg-white/60 hover:bg-white/90 shadow-lg backdrop-blur-sm active:scale-95 transition-all text-slate-600"
+                className={navBtnClass}
                 aria-label="Next Word"
               >
-                <ICONS.Next size={32} />
+                <ICONS.Next size={64} />
               </button>
           </div>
 
@@ -392,15 +437,22 @@ const App: React.FC = () => {
               )}
         </div>
 
-        {/* Bottom Half: Text */}
+        {/* Bottom Half: Text (Split into Spans for Hit Testing) */}
         <div className="flex-1 w-full flex items-start justify-center pt-2 sm:pt-4">
-            <span 
-              ref={textRef}
-              className="text-[20vh] sm:text-[25vh] text-black/15 tracking-widest leading-none text-center whitespace-nowrap mix-blend-multiply select-none pointer-events-none"
+            <div 
+              className="tracking-widest leading-none text-center whitespace-nowrap select-none pointer-events-none flex items-center justify-center"
               style={{ fontFamily: '"Andika", sans-serif' }}
             >
-              {currentWord.text}
-            </span>
+              {currentWord.text.split('').map((char, index) => (
+                <span
+                  key={index}
+                  ref={(el) => { letterRefs.current[index] = el; }}
+                  className="inline-block text-[20vh] sm:text-[25vh] text-black/15 mix-blend-multiply"
+                >
+                  {char}
+                </span>
+              ))}
+            </div>
         </div>
 
       </main>
@@ -411,8 +463,42 @@ const App: React.FC = () => {
            color={activeColor} 
            lineWidth={activeLineWidth}
            isEraser={isEraserMode}
+           onDraw={handleDraw}
+           onStrokeEnd={handleStrokeEnd}
       />
       
+      {/* Celebration Modal */}
+      {showCelebration && (
+        <div className="absolute inset-0 z-[100] bg-black/40 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] p-10 shadow-2xl flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500 max-w-sm w-full">
+            <div className="text-8xl animate-bounce mb-2">🎉</div>
+            <h2 className="text-4xl font-black text-crayon-blue font-hand text-center">Great Job!</h2>
+            <div className="text-slate-400 text-xl font-bold font-hand text-center">You traced {currentWord.text}!</div>
+            
+            <button 
+              onClick={handleNext}
+              className="mt-4 w-full py-4 bg-gradient-to-r from-crayon-blue to-blue-400 text-white rounded-2xl font-bold text-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
+            >
+              Next Word
+            </button>
+          </div>
+          {/* Confetti Effect (CSS only simplified) */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+             {[...Array(20)].map((_, i) => (
+               <div key={i} className="absolute animate-[spin_3s_linear_infinite]" 
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      top: `${Math.random() * 100}%`,
+                      animationDelay: `${Math.random() * 2}s`,
+                      opacity: 0.6
+                    }}>
+                   {['⭐', '🎈', '✨', '🎨'][i % 4]}
+               </div>
+             ))}
+          </div>
+        </div>
+      )}
+
       {/* Background Color Picker Modal */}
       {showBgPicker && (
         <div className="absolute inset-0 z-[60] bg-black/20 flex items-center justify-center p-4">

@@ -5,6 +5,8 @@ interface TraceCanvasProps {
   color: string;
   lineWidth: number;
   isEraser: boolean;
+  onDraw?: (x: number, y: number) => void;
+  onStrokeEnd?: () => void;
 }
 
 export interface TraceCanvasHandle {
@@ -12,7 +14,7 @@ export interface TraceCanvasHandle {
   getCanvas: () => HTMLCanvasElement | null;
 }
 
-const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, lineWidth, isEraser }, ref) => {
+const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, lineWidth, isEraser, onDraw, onStrokeEnd }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -93,6 +95,9 @@ const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, li
     contextRef.current.beginPath();
     contextRef.current.moveTo(x, y);
     setIsDrawing(true);
+    
+    // Notify parent
+    onDraw?.(nativeEvent.clientX, nativeEvent.clientY);
   };
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -105,6 +110,9 @@ const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, li
 
     contextRef.current.lineTo(x, y);
     contextRef.current.stroke();
+
+    // Notify parent with global coordinates for hit testing
+    onDraw?.(nativeEvent.clientX, nativeEvent.clientY);
   };
 
   const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -114,6 +122,9 @@ const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, li
     
     // Release capture
     e.currentTarget.releasePointerCapture(e.nativeEvent.pointerId);
+
+    // Notify parent that the stroke has ended
+    onStrokeEnd?.();
   };
 
   return (
