@@ -1,93 +1,81 @@
 
 /**
- * Calculates a tracing score by comparing the user's drawing to the expected text.
+ * Calculates a tracing score based on "Ink Density" within each letter's bounding box.
+ * Instead of trying to match exact font pixels (which fails due to browser rendering differences),
+ * we check if the user has drawn enough ink inside each letter's area.
  * 
  * @param userCanvas - The canvas element where the user drew.
- * @param text - The text string to compare against (e.g. "A").
- * @param textElement - The DOM element displaying the text (used for styles/sizing/position).
- * @returns A number between 0 and 100 representing accuracy.
+ * @param letterSpans - Array of span elements representing the letters on screen.
+ * @returns A number between 0 and 100. Returns 100 if all letters have sufficient ink.
  */
 export const calculateScore = (
   userCanvas: HTMLCanvasElement, 
-  text: string, 
-  textElement: HTMLElement
+  letterSpans: (HTMLSpanElement | null)[]
 ): number => {
-  // 1. Setup offscreen canvas
+  if (!userCanvas || letterSpans.length === 0) return 0;
+
+  const ctx = userCanvas.getContext('2d');
+  if (!ctx) return 0;
+
+  const canvasRect = userCanvas.getBoundingClientRect();
   const width = userCanvas.width;
   const height = userCanvas.height;
   
-  const targetCanvas = document.createElement('canvas');
-  targetCanvas.width = width;
-  targetCanvas.height = height;
-  const ctx = targetCanvas.getContext('2d');
+  // Calculate DPR based on actual canvas size vs CSS size
+  const dprX = width / canvasRect.width;
+  const dprY = height / canvasRect.height;
+
+  // Get all pixel data once (performance optimization)
+  const imageData = ctx.getImageData(0, 0, width, height).data;
+
+  let lettersCompleted = 0;
   
-  if (!ctx) return 0;
+  // We define a threshold for "filled". 
+  // Lowered to 3% to be more forgiving for 3-year-olds while ensuring more than just a dot.
+  // 3% of a large letter box is roughly a single solid stroke across the letter.
+  const DENSITY_THRESHOLD = 0.03; 
 
-  // 2. Determine Position relative to Canvas
-  // This is crucial now that text moves around (e.g. under an image)
-  const canvasRect = userCanvas.getBoundingClientRect();
-  const textRect = textElement.getBoundingClientRect();
+  letterSpans.forEach((span) => {
+    if (!span) return;
+    const rect = span.getBoundingClientRect();
 
-  // Calculate the center point of the text element relative to the canvas
-  // We need to account for DPR scaling if the canvas uses it
-  const dpr = userCanvas.clientWidth ? (userCanvas.width / userCanvas.clientWidth) : 1;
-  
-  const relativeX = (textRect.left - canvasRect.left + (textRect.width / 2)) * dpr;
-  const relativeY = (textRect.top - canvasRect.top + (textRect.height / 2)) * dpr;
+    // Map DOM Rect to Canvas Pixel Coordinates
+    const startX = Math.floor((rect.left - canvasRect.left) * dprX);
+    const startY = Math.floor((rect.top - canvasRect.top) * dprY);
+    const endX = Math.floor((rect.right - canvasRect.left) * dprX);
+    const endY = Math.floor((rect.bottom - canvasRect.top) * dprY);
 
-  // 3. Replicate text styling
-  const computedStyle = window.getComputedStyle(textElement);
-  const fontSizePx = parseFloat(computedStyle.fontSize);
-  
-  ctx.fillStyle = '#000000'; 
-  const fontFamily = computedStyle.fontFamily || '"Andika", sans-serif';
-  
-  // Apply scaling to font size
-  ctx.font = `${fontSizePx * dpr}px ${fontFamily}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  
-  if ('letterSpacing' in ctx) {
-     // @ts-ignore
-     ctx.letterSpacing = computedStyle.letterSpacing === 'normal' ? '0px' : computedStyle.letterSpacing;
-  }
+    // Boundary checks
+    const safeStartX = Math.max(0, startX);
+    const safeStartY = Math.max(0, startY);
+    const safeEndX = Math.min(width, endX);
+    const safeEndY = Math.min(height, endY);
 
-  // Draw text at the exact calculate position
-  ctx.fillText(text, relativeX, relativeY);
+    const boxArea = (safeEndX - safeStartX) * (safeEndY - safeStartY);
+    if (boxArea <= 0) return;
 
-  // 4. Compare Pixels
-  const targetData = ctx.getImageData(0, 0, width, height).data;
-  
-  const userCtx = userCanvas.getContext('2d');
-  if (!userCtx) return 0;
-  const userData = userCtx.getImageData(0, 0, width, height).data;
+    let coloredPixels = 0;
 
-  let targetPixels = 0;
-  let intersectionPixels = 0;
-  let outsidePixels = 0;
-
-  for (let i = 0; i < targetData.length; i += 4) {
-    const isTarget = targetData[i + 3] > 100; 
-    const isUser = userData[i + 3] > 50;      
-
-    if (isTarget) {
-      targetPixels++;
-      if (isUser) {
-        intersectionPixels++;
+    // Scan pixels within this letter's box
+    for (let y = safeStartY; y < safeEndY; y += 4) { // Optimization: Skip rows (step 4)
+      for (let x = safeStartX; x < safeEndX; x += 4) { // Optimization: Skip cols (step 4)
+        const index = (y * width + x) * 4;
+        // Check alpha channel (index + 3)
+        if (imageData[index + 3] > 50) {
+          coloredPixels++;
+        }
       }
-    } else if (isUser) {
-      outsidePixels++;
     }
-  }
 
-  if (targetPixels === 0) return 0;
+    // Since we skipped pixels (1 out of 16 checked), we multiply count by 16 to estimate total
+    const estimatedColoredPixels = coloredPixels * 16;
+    const ratio = estimatedColoredPixels / boxArea;
 
-  const coverage = intersectionPixels / targetPixels;
-  const errorRatio = outsidePixels / targetPixels;
-  
-  let score = coverage - (errorRatio * 0.3);
-  score = score * 1.3;
-  score = Math.max(0, Math.min(1, score));
+    if (ratio >= DENSITY_THRESHOLD) {
+      lettersCompleted++;
+    }
+  });
 
-  return Math.round(score * 100);
+  // Score is percentage of letters completed
+  return (lettersCompleted / letterSpans.length) * 100;
 };

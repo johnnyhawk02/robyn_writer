@@ -1,12 +1,15 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import TraceCanvas, { TraceCanvasHandle } from './components/TraceCanvas';
-import { INITIAL_WORDS, ICONS } from './constants';
+import { ICONS } from './constants';
+import { INITIAL_WORDS } from './data/words';
 import { TracingWord, BrushColor } from './types';
+import { calculateScore } from './services/scoringService';
 import { Link } from 'lucide-react';
 
 const STORAGE_KEY = 'tinytracer_custom_words';
 const BG_STORAGE_KEY = 'tinytracer_bg_color';
+const FONT_STORAGE_KEY = 'tinytracer_font';
 
 // More vibrant palette + White/Grey defaults
 const PRESET_COLORS = [
@@ -23,6 +26,13 @@ const PRESET_COLORS = [
   '#FBCFE8', // Pink 200
 ];
 
+const FONTS = [
+  { name: 'Andika', label: 'School', family: '"Andika", sans-serif' },
+  { name: 'Fredoka', label: 'Bubbly', family: '"Fredoka", sans-serif' },
+  { name: 'Comic Neue', label: 'Friendly', family: '"Comic Neue", cursive' },
+  { name: 'Patrick Hand', label: 'Marker', family: '"Patrick Hand", cursive' },
+];
+
 interface Balloon {
   id: number;
   x: number;
@@ -31,6 +41,7 @@ interface Balloon {
   delay: number;
   scale: number;
   rotation: number;
+  isPopping?: boolean;
 }
 
 const App: React.FC = () => {
@@ -42,7 +53,9 @@ const App: React.FC = () => {
   
   // Appearance
   const [bgColor, setBgColor] = useState(PRESET_COLORS[1]);
-  const [showBgPicker, setShowBgPicker] = useState(false);
+  const [currentFont, setCurrentFont] = useState(FONTS[0].family);
+  const [showBgPicker, setShowBgPicker] = useState(false); // Renamed in UI to "Settings"
+  const [settingsTab, setSettingsTab] = useState<'color' | 'font'>('color');
 
   // Celebration State
   const [showCelebration, setShowCelebration] = useState(false);
@@ -59,6 +72,7 @@ const App: React.FC = () => {
   const [isCompressing, setIsCompressing] = useState(false);
 
   // Image Loading State
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
 
@@ -70,10 +84,8 @@ const App: React.FC = () => {
   const canvasRef = useRef<TraceCanvasHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Hit Testing Refs
+  // DOM Refs for Scoring
   const letterRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const letterRects = useRef<DOMRect[]>([]);
-  const visitedZones = useRef<Set<number>>(new Set());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Initialization ---
@@ -88,22 +100,6 @@ const App: React.FC = () => {
     
     setIsIOSBrowser(isIOS && !isStandalone);
   }, []);
-
-  // Update rects when word changes or resize
-  useEffect(() => {
-    const updateRects = () => {
-      // Small delay to allow layout to settle (e.g. image loading)
-      setTimeout(() => {
-        letterRects.current = letterRefs.current
-          .filter(el => el !== null)
-          .map(el => el!.getBoundingClientRect());
-      }, 300);
-    };
-
-    updateRects();
-    window.addEventListener('resize', updateRects);
-    return () => window.removeEventListener('resize', updateRects);
-  }, [currentIndex, imageSrc]); // Update when imageSrc changes as it might shift text layout
 
   const loadWords = () => {
     const savedCustom = localStorage.getItem(STORAGE_KEY);
@@ -120,17 +116,25 @@ const App: React.FC = () => {
 
   const loadSettings = () => {
     const savedBg = localStorage.getItem(BG_STORAGE_KEY);
-    if (savedBg) {
-      setBgColor(savedBg);
-    }
+    if (savedBg) setBgColor(savedBg);
+    
+    const savedFont = localStorage.getItem(FONT_STORAGE_KEY);
+    if (savedFont) setCurrentFont(savedFont);
   };
 
   const handleSetBgColor = (color: string) => {
     setBgColor(color);
     localStorage.setItem(BG_STORAGE_KEY, color);
-    if (PRESET_COLORS.includes(color)) {
-      setShowBgPicker(false);
-    }
+  };
+
+  const handleSetFont = (fontFamily: string) => {
+    setCurrentFont(fontFamily);
+    localStorage.setItem(FONT_STORAGE_KEY, fontFamily);
+  };
+
+  const handleOpenSettings = (tab: 'color' | 'font') => {
+    setSettingsTab(tab);
+    setShowBgPicker(true);
   };
 
   const handleSetImageInputMethod = (method: 'upload' | 'url') => {
@@ -143,7 +147,6 @@ const App: React.FC = () => {
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
-    visitedZones.current.clear();
     setShowCelebration(false);
     setBalloons([]);
     letterRefs.current = []; // Reset refs
@@ -161,15 +164,25 @@ const App: React.FC = () => {
         delay: Math.random() * 2,
         scale: Math.random() * 0.4 + 0.8,
         rotation: Math.random() * 20 - 10,
+        isPopping: false
       }));
       setBalloons(newBalloons);
     }
   }, [showCelebration]);
 
   const popBalloon = (id: number) => {
-    setBalloons(prev => prev.filter(b => b.id !== id));
-    // Optional: Add haptic feedback if supported
+    // 1. Mark as popping to trigger animation
+    setBalloons(prev => prev.map(b => 
+      b.id === id ? { ...b, isPopping: true } : b
+    ));
+
+    // 2. Haptic
     if (navigator.vibrate) navigator.vibrate(50);
+
+    // 3. Remove after animation finishes (300ms matches CSS)
+    setTimeout(() => {
+      setBalloons(prev => prev.filter(b => b.id !== id));
+    }, 300);
   };
 
   // --- Robust Image Loading Logic ---
@@ -177,6 +190,7 @@ const App: React.FC = () => {
     setImgError(false);
     
     if (currentWord.imageUrl) {
+      setIsImageLoading(true);
       if (currentWord.imageUrl.startsWith('data:')) {
         setImageSrc(currentWord.imageUrl);
       } 
@@ -195,6 +209,7 @@ const App: React.FC = () => {
       }
     } else {
       setImageSrc(null);
+      setIsImageLoading(false);
     }
   }, [currentWord, currentIndex]);
 
@@ -211,12 +226,12 @@ const App: React.FC = () => {
 
     // If we are already on http or relative failed, show error
     setImgError(true);
+    setIsImageLoading(false);
   };
 
   // --- Handlers: Canvas ---
   const handleClear = () => {
     canvasRef.current?.clearCanvas();
-    visitedZones.current.clear();
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
   };
@@ -235,39 +250,33 @@ const App: React.FC = () => {
     setIsEraserMode(!isEraserMode);
   };
 
-  // --- Drawing & Hit Detection ---
+  // --- Drawing & Score Detection ---
   const handleDraw = useCallback((x: number, y: number) => {
-    // If we are erasing or already won, don't check
-    if (isEraserMode || showCelebration || timerRef.current) return;
-
-    const rects = letterRects.current;
-    const padding = 20; // Forgive sloppy tracing by expanding hit area
-
-    rects.forEach((rect, index) => {
-      if (
-        x >= rect.left - padding &&
-        x <= rect.right + padding &&
-        y >= rect.top - padding &&
-        y <= rect.bottom + padding
-      ) {
-        visitedZones.current.add(index);
-      }
-    });
-  }, [isEraserMode, showCelebration]);
+    // No-op for now, we check score on lift
+  }, []);
 
   const handleStrokeEnd = useCallback(() => {
-    // Check win condition ONLY when stylus lifts up
     if (isEraserMode || showCelebration || timerRef.current) return;
 
-    if (visitedZones.current.size === currentWord.text.length) {
-      // All letters touched! Start timer.
+    // Check accuracy using ink density analysis
+    const canvas = canvasRef.current?.getCanvas();
+    if (!canvas) return;
+
+    // Filter out null refs just in case
+    const validSpans = letterRefs.current.filter(Boolean);
+    
+    // Calculate score (Percentage of letters filled)
+    const score = calculateScore(canvas, validSpans);
+    
+    // Require 100% of letters to be "attempted"
+    if (score === 100) {
       if (!timerRef.current) {
         timerRef.current = setTimeout(() => {
           setShowCelebration(true);
-        }, 1000); // 1 second delay before party
+        }, 500); 
       }
     }
-  }, [currentWord.text.length, isEraserMode, showCelebration]);
+  }, [isEraserMode, showCelebration]);
 
   // --- Handlers: Upload with Compression ---
   const compressImage = (file: File): Promise<string> => {
@@ -326,7 +335,7 @@ const App: React.FC = () => {
     const newWord: TracingWord = {
       id: Date.now().toString(),
       text: newWordText.toLowerCase(),
-      category: 'My Words',
+      // Removed category assignment
       imageUrl: finalImage || undefined,
       emoji: !finalImage ? '📝' : undefined
     };
@@ -391,8 +400,32 @@ const App: React.FC = () => {
           75% { background-color: #F5D0FE; }
           100% { background-color: #FECACA; }
         }
+        @keyframes balloonPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+        }
+        @keyframes pop {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.4); opacity: 0.8; }
+          100% { transform: scale(1.6); opacity: 0; }
+        }
+        .animate-balloon-pulse {
+          animation: balloonPulse 2s ease-in-out infinite;
+        }
+        .animate-pop {
+          animation: pop 0.3s ease-out forwards !important;
+        }
       `}</style>
       
+      {/* Loading Overlay - blocks interaction and hides unready content */}
+      {isImageLoading && (
+        <div className="absolute inset-0 z-[100] bg-slate-50 flex items-center justify-center transition-opacity duration-300">
+          <div className="flex flex-col items-center gap-4 animate-pulse">
+             <ICONS.Pencil size={64} className="text-crayon-blue animate-bounce" />
+          </div>
+        </div>
+      )}
+
       {/* --- Floating UI Controls Layer --- */}
       <div className="absolute inset-0 z-50 pointer-events-none p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col justify-between">
           
@@ -402,11 +435,18 @@ const App: React.FC = () => {
               {/* Left Group: Settings & Add */}
               <div className="flex flex-col gap-3">
                  <button 
-                   onClick={() => setShowBgPicker(true)}
+                   onClick={() => handleOpenSettings('color')}
                    className={floatBtnClass}
-                   aria-label="Change Color"
+                   aria-label="Colors"
                  >
                    <ICONS.Palette size={24} className="text-slate-600" />
+                 </button>
+                 <button 
+                   onClick={() => handleOpenSettings('font')}
+                   className={floatBtnClass}
+                   aria-label="Fonts"
+                 >
+                   <ICONS.Type size={24} className="text-slate-600" />
                  </button>
                  <button 
                    onClick={() => setShowUploadModal(true)}
@@ -422,11 +462,8 @@ const App: React.FC = () => {
                  )}
               </div>
 
-              {/* Center Group: Category (Minimal) */}
+              {/* Center Group: Pagination Dots Only (Category Removed) */}
               <div className="flex flex-col items-center pt-2 opacity-60">
-                <span className="text-xs font-bold text-black/40 tracking-widest uppercase mb-1 mix-blend-multiply">
-                  {currentWord.category}
-                </span>
                  <div className="flex gap-1">
                     {words.map((_, idx) => (
                        <div 
@@ -488,12 +525,13 @@ const App: React.FC = () => {
                 <img 
                   key={imageSrc} 
                   src={imageSrc} 
+                  onLoad={() => setIsImageLoading(false)}
                   onError={handleImageError}
                   alt={currentWord.text} 
-                  className="h-[38vh] sm:h-[45vh] w-auto max-w-[95vw] object-contain animate-in zoom-in-95 duration-700 drop-shadow-md select-none pointer-events-none" 
+                  className="h-[38vh] sm:h-[45vh] w-auto max-w-[95vw] translate-y-[20%] object-contain animate-in zoom-in-95 duration-700 drop-shadow-md select-none pointer-events-none" 
                 />
               ) : (
-                <div className="flex items-center justify-center opacity-30">
+                <div className="flex items-center justify-center opacity-30 translate-y-[20%]">
                   <span className="text-[25vh] leading-none mix-blend-multiply text-black/20 select-none pointer-events-none">
                     {currentWord.emoji || '🎨'}
                   </span>
@@ -506,7 +544,7 @@ const App: React.FC = () => {
         <div className="flex-1 w-full flex items-start justify-center pt-2 sm:pt-4 pb-10">
             <div 
               className="tracking-widest leading-none text-center whitespace-nowrap select-none pointer-events-none flex items-center justify-center"
-              style={{ fontFamily: '"Andika", sans-serif' }}
+              style={{ fontFamily: currentFont }}
             >
               {currentWord.text.split('').map((char, index) => (
                 <span
@@ -566,66 +604,102 @@ const App: React.FC = () => {
                  '--rot': `${b.rotation}deg`,
                } as React.CSSProperties}
              >
-                {/* CSS Balloon Shape */}
-                <div 
-                   className="w-[80px] h-[95px] rounded-[50%_50%_50%_50%_/_40%_40%_60%_60%] shadow-inner transition-transform active:scale-150 active:opacity-0"
-                   style={{ 
-                      backgroundColor: b.color,
-                      boxShadow: 'inset -10px -10px 20px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2)'
-                   }}
-                >
-                   {/* Shine */}
-                   <div className="absolute top-[15%] left-[20%] w-[15px] h-[25px] bg-white/30 rounded-[50%] rotate-[-30deg]" />
+                {/* Independent Pulse Animation Wrapper */}
+                <div className={`w-full h-full origin-bottom ${b.isPopping ? 'animate-pop' : 'animate-balloon-pulse'}`}>
+                  {/* CSS Balloon Shape */}
+                  <div 
+                     className="w-[80px] h-[95px] rounded-[50%_50%_50%_50%_/_40%_40%_60%_60%] shadow-inner transition-transform active:scale-150 active:opacity-0"
+                     style={{ 
+                        backgroundColor: b.color,
+                        boxShadow: 'inset -10px -10px 20px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2)'
+                     }}
+                  >
+                     {/* Shine */}
+                     <div className="absolute top-[15%] left-[20%] w-[15px] h-[25px] bg-white/30 rounded-[50%] rotate-[-30deg]" />
+                  </div>
+                  {/* Knot */}
+                  <div 
+                     className="absolute bottom-[24px] left-[40px] -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[10px] border-l-transparent border-r-transparent"
+                     style={{ borderBottomColor: b.color }}
+                  />
+                  {/* String */}
+                  <div className="absolute bottom-0 left-[40px] -translate-x-1/2 w-[1px] h-[25px] bg-slate-400/50" />
                 </div>
-                {/* Knot */}
-                <div 
-                   className="absolute bottom-[24px] left-[40px] -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[10px] border-l-transparent border-r-transparent"
-                   style={{ borderBottomColor: b.color }}
-                />
-                {/* String */}
-                <div className="absolute bottom-0 left-[40px] -translate-x-1/2 w-[1px] h-[25px] bg-slate-400/50" />
              </div>
           ))}
 
         </div>
       )}
 
-      {/* Background Color Picker Modal */}
+      {/* Settings Modal (Colors & Fonts) */}
       {showBgPicker && (
         <div className="absolute inset-0 z-[60] bg-black/20 flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
              <div className="flex justify-between items-center mb-6">
-               <h2 className="text-2xl font-bold text-slate-700 font-hand">Paper Color</h2>
+               <h2 className="text-2xl font-bold text-slate-700 font-hand">Appearance</h2>
                <button onClick={() => setShowBgPicker(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
                  <ICONS.Close size={20} />
                </button>
              </div>
              
-             <div className="grid grid-cols-4 gap-4 mb-4">
-               {PRESET_COLORS.map((hex) => (
-                 <button
-                   key={hex}
-                   onClick={() => handleSetBgColor(hex)}
-                   className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
-                   style={{ backgroundColor: hex }}
-                   aria-label={`Select background ${hex}`}
-                 />
-               ))}
+             {/* Tabbed content or scroll to section based on what button was clicked */}
+             <div className="space-y-8">
                
-               {/* Custom Color Picker Button */}
-               <div className="relative w-full aspect-square rounded-full shadow-inner border-4 border-slate-100 overflow-hidden group">
-                 <input
-                  type="color"
-                  value={bgColor}
-                  onChange={(e) => handleSetBgColor(e.target.value)}
-                  className="absolute inset-[-50%] w-[200%] h-[200%] cursor-pointer p-0 border-0"
-                  title="Choose custom color"
-                 />
-                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-white/20 group-hover:bg-transparent">
-                    <ICONS.Palette size={20} className="text-slate-600 mix-blend-multiply" />
+               {/* Colors Section */}
+               <div ref={settingsTab === 'color' ? (el) => el?.scrollIntoView({ behavior: 'smooth' }) : null}>
+                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                   <ICONS.Palette size={16} /> Paper Color
+                 </h3>
+                 <div className="grid grid-cols-4 gap-4">
+                   {PRESET_COLORS.map((hex) => (
+                     <button
+                       key={hex}
+                       onClick={() => handleSetBgColor(hex)}
+                       className={`w-full aspect-square rounded-full shadow-inner border-4 transition-transform active:scale-95 ${bgColor === hex ? 'border-crayon-blue scale-110' : 'border-transparent'}`}
+                       style={{ backgroundColor: hex }}
+                       aria-label={`Select background ${hex}`}
+                     />
+                   ))}
+                   
+                   {/* Custom Color Picker Button */}
+                   <div className="relative w-full aspect-square rounded-full shadow-inner border-4 border-slate-100 overflow-hidden group">
+                     <input
+                      type="color"
+                      value={bgColor}
+                      onChange={(e) => handleSetBgColor(e.target.value)}
+                      className="absolute inset-[-50%] w-[200%] h-[200%] cursor-pointer p-0 border-0"
+                      title="Choose custom color"
+                     />
+                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-white/20 group-hover:bg-transparent">
+                        <ICONS.Palette size={20} className="text-slate-600 mix-blend-multiply" />
+                     </div>
+                   </div>
                  </div>
                </div>
+
+               <div className="h-px bg-slate-100" />
+
+               {/* Fonts Section */}
+               <div ref={settingsTab === 'font' ? (el) => el?.scrollIntoView({ behavior: 'smooth' }) : null}>
+                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                   <ICONS.Type size={16} /> Font Style
+                 </h3>
+                 <div className="grid grid-cols-1 gap-2">
+                    {FONTS.map((font) => (
+                      <button
+                        key={font.name}
+                        onClick={() => handleSetFont(font.family)}
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all flex justify-between items-center ${currentFont === font.family ? 'border-crayon-blue bg-blue-50 text-crayon-blue' : 'border-slate-100 text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <span className="text-2xl" style={{ fontFamily: font.family }}>Aa</span>
+                        <span className="font-bold text-sm opacity-70 font-sans">{font.label}</span>
+                      </button>
+                    ))}
+                 </div>
+               </div>
+
              </div>
+
            </div>
         </div>
       )}
