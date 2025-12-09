@@ -1,5 +1,5 @@
 
-import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X, Download, SquareArrowUp, Palette, Type } from 'lucide-react';
+import { Pencil, Trash2, ArrowRight, ArrowLeft, Eraser, Trophy, Plus, Image as ImageIcon, X, Download, SquareArrowUp, Palette, Type, House, LayoutGrid, Gamepad2, Puzzle, Music } from 'lucide-react';
 
 export const ICONS = {
   Pencil,
@@ -14,5 +14,10 @@ export const ICONS = {
   Download,
   ShareIOS: SquareArrowUp,
   Palette,
-  Type // Added Type icon for font selection
+  Type,
+  Home: House,
+  Grid: LayoutGrid,
+  Game: Gamepad2,
+  Puzzle,
+  Music
 };

@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } f
 interface TraceCanvasProps {
   color: string;
   lineWidth: number;
-  isEraser: boolean;
   onDraw?: (x: number, y: number) => void;
   onStrokeEnd?: () => void;
 }
@@ -14,7 +13,7 @@ export interface TraceCanvasHandle {
   getCanvas: () => HTMLCanvasElement | null;
 }
 
-const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, lineWidth, isEraser, onDraw, onStrokeEnd }, ref) => {
+const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, lineWidth, onDraw, onStrokeEnd }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -74,10 +73,9 @@ const TraceCanvas = forwardRef<TraceCanvasHandle, TraceCanvasProps>(({ color, li
     if (contextRef.current) {
       contextRef.current.strokeStyle = color;
       contextRef.current.lineWidth = lineWidth;
-      // 'destination-out' removes pixels (true eraser), 'source-over' draws new pixels
-      contextRef.current.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+      contextRef.current.globalCompositeOperation = 'source-over';
     }
-  }, [color, lineWidth, isEraser]);
+  }, [color, lineWidth]);
 
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const { nativeEvent } = e;
